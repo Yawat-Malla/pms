@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProgramStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  VERIFIED
+  RECOMMENDED
+  CONTRACTED
+  MONITORING
+  PAYMENT_RUNNING
+  PAYMENT_FINAL
+  CLOSED
+  ARCHIVED
+}
+
+model Ward {
+  id       String    @id @default(cuid())
+  code     String    @unique
+  name     String
+  users    User[]
+  programs Program[]
+  createdAt DateTime @default(now())
+}
+
+model Role {
+  id    String @id @default(cuid())
+  name  String @unique
+  users User[]            // <-- keep implicit M:N here (no @relation)
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  hashedPassword String?
+  ward           Ward?    @relation(fields: [wardId], references: [id])
+  wardId         String?
+  roles          Role[]   // <-- remove @relation(...) here
+  programsCreated Program[] @relation("ProgramCreatedBy")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Program {
+  id            String         @id @default(cuid())
+  code          String         @unique
+  name          String
+  fiscalYear    String
+  sector        String?
+  budget        Decimal?       @db.Decimal(14,2)
+  status        ProgramStatus  @default(DRAFT)
+  ward          Ward           @relation(fields: [wardId], references: [id])
+  wardId        String
+  createdBy     User?          @relation("ProgramCreatedBy", fields: [createdById], references: [id])
+  createdById   String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+//// NextAuth models ////
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
