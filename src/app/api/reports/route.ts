@@ -2,6 +2,36 @@ import { NextResponse } from "next/server";
 import { prisma, ensureDbExists } from "@/lib/prisma";
 import { z } from "zod";
 
+interface WardData {
+  ward: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  programs: ProgramWithPayments[];
+  totalBudget: number;
+  totalSpent: number;
+}
+
+interface ProgramWithPayments {
+  id: string;
+  code: string;
+  name: string;
+  budget: number | string;
+  ward: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  payments: PaymentData[];
+}
+
+interface PaymentData {
+  id: string;
+  amount: number | string;
+  status: string;
+}
+
 // Validation schema for report generation
 const generateReportSchema = z.object({
   name: z.string().min(1, "Report name is required"),
@@ -143,7 +173,7 @@ export async function POST(request: Request) {
         }
       }, { status: 201 });
 
-    } catch (generationError) {
+    } catch {
       // Update report with failure
       await prisma.report.update({
         where: { id: report.id },
@@ -221,7 +251,8 @@ async function generateWardReport(filters: Record<string, unknown>, parameters: 
   });
 
   // Group by ward and calculate statistics
-  const wardData = programs.reduce((acc: Record<string, unknown>, program) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const wardData = programs.reduce((acc: Record<string, WardData>, program: any) => {
     const wardKey = program.ward.code;
     if (!acc[wardKey]) {
       acc[wardKey] = {
@@ -231,11 +262,12 @@ async function generateWardReport(filters: Record<string, unknown>, parameters: 
         totalSpent: 0
       };
     }
-    
+
     acc[wardKey].programs.push(program);
     acc[wardKey].totalBudget += Number(program.budget || 0);
-    acc[wardKey].totalSpent += program.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
-    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    acc[wardKey].totalSpent += program.payments.reduce((sum: number, payment: any) => sum + Number(payment.amount), 0);
+
     return acc;
   }, {});
 

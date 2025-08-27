@@ -126,14 +126,19 @@ export async function POST(request: NextRequest) {
       data: {
         code: validatedData.code,
         name: validatedData.name,
-        fiscalYear: fiscalYear.year, // Store the year string for backward compatibility
-        wardId: validatedData.wardId,
+        fiscalYear: {
+          connect: { id: validatedData.fiscalYearId }
+        },
+        ward: {
+          connect: { id: validatedData.wardId }
+        },
         budget: budgetDecimal,
-        fundingSource: fundingSource.code, // Store the code for backward compatibility
-        programType: programType.code, // Store the code for backward compatibility
-        fiscalYearId: validatedData.fiscalYearId, // Store the relation to fiscal year
-        fundingSourceId: validatedData.fundingSourceId, // Store the relation to funding source
-        programTypeId: validatedData.programTypeId, // Store the relation to program type
+        fundingSource: {
+          connect: { id: validatedData.fundingSourceId }
+        },
+        programType: {
+          connect: { id: validatedData.programTypeId }
+        },
         description: validatedData.description,
         startDate,
         endDate,

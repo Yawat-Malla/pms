@@ -6,7 +6,7 @@ import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
 import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { motion } from "framer-motion";
-import { Search, Clock, CheckCircle2, XCircle, Upload, Eye, Check, X, Download, MoreHorizontal, Calendar, Building2, FileText, User, Loader2 } from "lucide-react";
+import { Search, Upload, Eye, Check, X, Download, MoreHorizontal, Calendar, Building2, FileText, User, Loader2 } from "lucide-react";
 import { HydrationSafe } from "@/components/ui/HydrationSafe";
 
 interface Approval {

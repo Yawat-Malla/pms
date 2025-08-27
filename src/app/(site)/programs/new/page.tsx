@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Shell from "@/components/layout/Shell";
 import { Card } from "@/components/ui/Card";
@@ -170,7 +170,7 @@ export default function CreateProgramPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (isDraft: boolean = false) => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
     
     setIsSubmitting(true);
@@ -488,7 +488,7 @@ export default function CreateProgramPage() {
                 <motion.button 
                   whileHover={{ y: -2 }} 
                   whileTap={{ scale: 0.98 }} 
-                  onClick={() => handleSubmit(true)}
+                  onClick={() => handleSubmit()}
                   disabled={isSubmitting}
                   className="rounded-xl border px-3 py-2 text-sm disabled:opacity-50"
                 >
@@ -498,7 +498,7 @@ export default function CreateProgramPage() {
                 <motion.button 
                   whileHover={{ y: -2 }} 
                   whileTap={{ scale: 0.98 }} 
-                  onClick={() => handleSubmit(false)}
+                  onClick={() => handleSubmit()}
                   disabled={isSubmitting}
                   className="rounded-xl bg-gray-900 px-3 py-2 text-sm text-white disabled:opacity-50"
                 >

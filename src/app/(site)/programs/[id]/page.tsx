@@ -7,7 +7,7 @@ import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
 import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { motion } from "framer-motion";
-import { Edit, Trash2, Download, Calendar, Building2, DollarSign, User, Clock, FileText, Upload, MessageSquare, Link as LinkIcon, Eye, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { Edit, Trash2, Download, Calendar, Building2, DollarSign, User, FileText, Upload, MessageSquare, Eye } from "lucide-react";
 import { HydrationSafe } from "@/components/ui/HydrationSafe";
 
 interface Program {

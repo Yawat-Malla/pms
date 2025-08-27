@@ -277,10 +277,10 @@ export async function PUT(
         description: `Monitoring entry updated for program ${monitoring.program.name}`,
         entityType: "monitoring",
         entityId: monitoring.id,
-        metadata: {
+        metadata: JSON.parse(JSON.stringify({
           programId: programId,
           changes: updateData
-        } as any
+        }))
       }
     });
 

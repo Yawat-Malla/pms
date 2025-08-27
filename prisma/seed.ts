@@ -64,16 +64,67 @@ async function main() {
     },
   });
 
+  // Create fiscal years
+  console.log('Creating fiscal years...');
+  const fiscalYear = await prisma.fiscalYear.upsert({
+    where: { year: '2025/26' },
+    update: {},
+    create: {
+      year: '2025/26',
+      isActive: true,
+    },
+  });
+
+  // Create funding sources
+  console.log('Creating funding sources...');
+  const redBookFunding = await prisma.fundingSource.upsert({
+    where: { code: 'RED_BOOK' },
+    update: {},
+    create: {
+      code: 'RED_BOOK',
+      name: 'Red Book',
+    },
+  });
+
+  const executiveFunding = await prisma.fundingSource.upsert({
+    where: { code: 'EXECUTIVE' },
+    update: {},
+    create: {
+      code: 'EXECUTIVE',
+      name: 'Executive',
+    },
+  });
+
+  // Create program types
+  console.log('Creating program types...');
+  const newProgramType = await prisma.programType.upsert({
+    where: { code: 'NEW' },
+    update: {},
+    create: {
+      code: 'NEW',
+      name: 'New Program',
+    },
+  });
+
+  const continuingProgramType = await prisma.programType.upsert({
+    where: { code: 'CONTINUING' },
+    update: {},
+    create: {
+      code: 'CONTINUING',
+      name: 'Continuing Program',
+    },
+  });
+
   // Create some sample programs
   console.log('Creating sample programs...');
   const samplePrograms = [
     {
       code: 'PRG-2025-0001',
       name: 'Road Maintenance and Upgradation Project',
-      fiscalYear: '2025/26',
+      fiscalYear: fiscalYear.id,
       budget: 2500000,
-      fundingSource: 'RED_BOOK',
-      programType: 'NEW',
+      fundingSource: redBookFunding.id,
+      programType: newProgramType.id,
       description: 'Comprehensive road maintenance and upgrading project covering major arterial roads in Ward 12.',
       status: 'DRAFT',
       wardCode: '12',
@@ -84,10 +135,10 @@ async function main() {
     {
       code: 'PRG-2025-0002',
       name: 'Water Supply Upgrade Project',
-      fiscalYear: '2025/26',
+      fiscalYear: fiscalYear.id,
       budget: 1800000,
-      fundingSource: 'EXECUTIVE',
-      programType: 'NEW',
+      fundingSource: executiveFunding.id,
+      programType: newProgramType.id,
       description: 'Upgrading water supply infrastructure in Ward 5 to improve water quality and distribution.',
       status: 'SUBMITTED',
       wardCode: '05',
@@ -98,10 +149,10 @@ async function main() {
     {
       code: 'PRG-2025-0003',
       name: 'School Renovation Project',
-      fiscalYear: '2025/26',
+      fiscalYear: fiscalYear.id,
       budget: 3200000,
-      fundingSource: 'RED_BOOK',
-      programType: 'CARRIED_OVER',
+      fundingSource: redBookFunding.id,
+      programType: continuingProgramType.id,
       description: 'Renovation and modernization of primary school buildings in Ward 8.',
       status: 'APPROVED',
       wardCode: '08',

@@ -6,8 +6,7 @@ import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
 import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { motion } from "framer-motion";
-import { Filter, Search, Download, FileText, BarChart3, PieChart, TrendingUp, Calendar, Building2, Eye, Printer, FileSpreadsheet, Loader2 } from "lucide-react";
-import { HydrationSafe } from "@/components/ui/HydrationSafe";
+import { Filter, Search, Download, FileText, BarChart3, TrendingUp, Calendar, Building2, Eye, Printer, FileSpreadsheet, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 interface Report {
@@ -73,7 +72,6 @@ export default function ReportsPage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
         // Refresh reports list
         fetchReports();
       } else {

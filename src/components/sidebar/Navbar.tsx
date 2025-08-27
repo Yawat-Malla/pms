@@ -2,13 +2,12 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  Home, 
-  Users, 
-  BarChart3, 
-  Settings, 
+import {
+  Home,
+  Users,
+  BarChart3,
+  Settings,
   LogOut,
-  FolderOpen,
 } from "lucide-react";
 
 // Custom Programs icon component

@@ -20,7 +20,7 @@ export async function ensureDbExists() {
     console.log('Database connection successful');
     return true;
   } catch (error: unknown) {
-    if (error.message.includes('database "pms_db" does not exist')) {
+    if (error instanceof Error && error.message.includes('database "pms_db" does not exist')) {
       console.error('Database does not exist. Please create it manually.');
     } else {
       console.error('Database connection error:', error);

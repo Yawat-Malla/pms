@@ -5,7 +5,12 @@ import { Task, TaskCard } from "@/components/kanban/TaskCard";
 import { motion, AnimatePresence } from "framer-motion";
 
 
-export default function KanbanColumn({ title, initial = [] as Task[] }) {
+interface KanbanColumnProps {
+  title: string;
+  initial?: Task[];
+}
+
+export default function KanbanColumn({ title, initial = [] as Task[] }: KanbanColumnProps) {
 const [tasks, setTasks] = useState<Task[]>(initial);
 return (
 <section className="space-y-3">

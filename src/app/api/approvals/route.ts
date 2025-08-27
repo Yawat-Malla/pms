@@ -19,7 +19,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'pending';
     const ward = searchParams.get('ward');
-    const moduleParam = searchParams.get('module');
     const fiscalYear = searchParams.get('fiscalYear');
 
     // Build where clause
