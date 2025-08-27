@@ -16,6 +16,24 @@ interface Ward {
   name: string;
 }
 
+interface FiscalYear {
+  id: string;
+  year: string;
+  isActive: boolean;
+}
+
+interface ProgramType {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface FundingSource {
+  id: string;
+  name: string;
+  code: string;
+}
+
 export default function CreateProgramPage() {
   const router = useRouter();
   const today = new Date();
@@ -24,9 +42,10 @@ export default function CreateProgramPage() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [wards, setWards] = useState<Ward[]>([]);
+  const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([]);
+  const [programTypes, setProgramTypes] = useState<ProgramType[]>([]);
+  const [fundingSources, setFundingSources] = useState<FundingSource[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const fiscalYears = useMemo(() => [year - 1, year, year + 1], [year]);
 
   // Generate program ID only on client side to prevent hydration mismatch
   useEffect(() => {
@@ -37,11 +56,11 @@ export default function CreateProgramPage() {
   const [form, setForm] = useState({
     code: "",
     name: "",
-    fiscalYear: String(year),
+    fiscalYearId: "",
     wardId: "",
-    type: "NEW" as "NEW" | "CARRIED_OVER" | "EXTENSION",
+    programTypeId: "",
     budget: "",
-    funding: "RED_BOOK" as "RED_BOOK" | "EXECUTIVE" | "OTHER",
+    fundingSourceId: "",
     description: "",
     startDate: "",
     endDate: "",
@@ -60,21 +79,62 @@ export default function CreateProgramPage() {
   const [redBookFiles, setRedBookFiles] = useState<FileItem[]>([]);
   const [execFiles, setExecFiles] = useState<FileItem[]>([]);
 
-  // Fetch wards on component mount
+  // Fetch all dynamic configuration data on component mount
   useEffect(() => {
-    const fetchWards = async () => {
+    const fetchConfigData = async () => {
       try {
-        const response = await fetch('/api/wards');
-        if (response.ok) {
-          const data = await response.json();
-          setWards(data.wards);
+        // Fetch wards
+        const wardsResponse = await fetch('/api/wards');
+        if (wardsResponse.ok) {
+          const data = await wardsResponse.json();
+          setWards(data.wards || []);
+        }
+        
+        // Fetch fiscal years
+        const fiscalYearsResponse = await fetch('/api/fiscyears');
+        if (fiscalYearsResponse.ok) {
+          const data = await fiscalYearsResponse.json();
+          setFiscalYears(data.fiscalYears || []);
+          
+          // Set active fiscal year as default if available
+          const activeFiscalYear = data.fiscalYears?.find((fy: FiscalYear) => fy.isActive);
+          if (activeFiscalYear) {
+            setForm(prev => ({ ...prev, fiscalYearId: activeFiscalYear.id }));
+          } else if (data.fiscalYears?.length > 0) {
+            setForm(prev => ({ ...prev, fiscalYearId: data.fiscalYears[0].id }));
+          }
+        }
+        
+        // Fetch program types
+        const programTypesResponse = await fetch('/api/programtypes');
+        if (programTypesResponse.ok) {
+          const data = await programTypesResponse.json();
+          setProgramTypes(data.programTypes || []);
+          
+          // Set first program type as default if available
+          if (data.programTypes?.length > 0) {
+            setForm(prev => ({ ...prev, programTypeId: data.programTypes[0].id }));
+          }
+        }
+        
+        // Fetch funding sources
+        const fundingSourcesResponse = await fetch('/api/fundsources');
+        if (fundingSourcesResponse.ok) {
+          const data = await fundingSourcesResponse.json();
+          setFundingSources(data.fundingSources || []);
+          
+          // Set first funding source as default if available
+          if (data.fundingSources?.length > 0) {
+            setForm(prev => ({ ...prev, fundingSourceId: data.fundingSources[0].id }));
+          }
         }
       } catch (error) {
-        console.error('Error fetching wards:', error);
+        console.error('Error fetching configuration data:', error);
+        setErrors(prev => ({ ...prev, general: "Failed to load configuration data" }));
       }
     };
     
-    fetchWards();
+    fetchConfigData();
   }, []);
 
   function handleChange<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -102,6 +162,8 @@ export default function CreateProgramPage() {
     
     if (!form.name.trim()) newErrors.name = "Program name is required";
     if (!form.wardId) newErrors.wardId = "Ward is required";
+    if (!form.programTypeId) newErrors.programTypeId = "Program type is required";
+    if (!form.fundingSourceId) newErrors.fundingSourceId = "Funding source is required";
     if (form.budget && isNaN(parseFloat(form.budget))) newErrors.budget = "Invalid budget amount";
     
     setErrors(newErrors);
@@ -120,11 +182,11 @@ export default function CreateProgramPage() {
       const programData = {
         code: form.code,
         name: form.name.trim(),
-        fiscalYear: form.fiscalYear,
+        fiscalYearId: form.fiscalYearId,
         wardId: form.wardId,
         budget: form.budget || undefined,
-        fundingSource: form.funding,
-        programType: form.type,
+        fundingSourceId: form.fundingSourceId,
+        programTypeId: form.programTypeId,
         description: form.description.trim() || undefined,
         startDate: form.startDate || undefined,
         endDate: form.endDate || undefined,
@@ -225,41 +287,67 @@ export default function CreateProgramPage() {
               <div className="relative mt-1">
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <select 
-                  value={form.fiscalYear} 
-                  onChange={(e) => handleChange("fiscalYear", e.target.value)} 
+                  value={form.fiscalYearId} 
+                  onChange={(e) => handleChange("fiscalYearId", e.target.value)} 
                   className="w-full appearance-none rounded-xl border bg-white px-3 py-2 text-sm"
                 >
-                  {fiscalYears.map((fy) => (<option key={fy} value={fy}>{fy}</option>))}
+                  {fiscalYears.length === 0 ? (
+                    <option value="">Loading fiscal years...</option>
+                  ) : (
+                    fiscalYears.map((fy) => (
+                      <option key={fy.id} value={fy.id}>
+                        {fy.year} {fy.isActive ? "(Active)" : ""}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
             <div>
               <label className="text-xs text-gray-600">Ward *</label>
-              <select 
-                value={form.wardId} 
-                onChange={(e) => handleChange("wardId", e.target.value)} 
-                className={`mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm ${errors.wardId ? 'border-rose-300' : ''}`}
-              >
-                <option value="">Select ward...</option>
-                {wards.map((ward) => (
-                  <option key={ward.id} value={ward.id}>
-                    Ward {ward.code} - {ward.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative mt-1">
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <select 
+                  value={form.wardId} 
+                  onChange={(e) => handleChange("wardId", e.target.value)} 
+                  className={`w-full appearance-none rounded-xl border bg-white px-3 py-2 text-sm ${errors.wardId ? 'border-rose-300' : ''}`}
+                >
+                  <option value="">Select Ward</option>
+                  {wards.length === 0 ? (
+                    <option value="" disabled>Loading wards...</option>
+                  ) : (
+                    wards.map((ward) => (
+                      <option key={ward.id} value={ward.id}>
+                        Ward {ward.code} - {ward.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
               {errors.wardId && <div className="text-xs text-rose-600 mt-1">{errors.wardId}</div>}
             </div>
             <div>
-              <label className="text-xs text-gray-600">Program Type</label>
-              <select 
-                value={form.type} 
-                onChange={(e) => handleChange("type", e.target.value as any)} 
-                className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"
-              >
-                <option value="NEW">New Program</option>
-                <option value="CARRIED_OVER">Carried-over</option>
-                <option value="EXTENSION">Extension</option>
-              </select>
+              <label className="text-xs text-gray-600">Program Type *</label>
+              <div className="relative mt-1">
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <select 
+                  value={form.programTypeId} 
+                  onChange={(e) => handleChange("programTypeId", e.target.value)} 
+                  className={`w-full appearance-none rounded-xl border bg-white px-3 py-2 text-sm ${errors.programTypeId ? 'border-rose-300' : ''}`}
+                >
+                  <option value="">Select Program Type</option>
+                  {programTypes.length === 0 ? (
+                    <option value="" disabled>Loading program types...</option>
+                  ) : (
+                    programTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              {errors.programTypeId && <div className="text-xs text-rose-600 mt-1">{errors.programTypeId}</div>}
             </div>
             <div>
               <label className="text-xs text-gray-600">Budget Amount</label>
@@ -272,16 +360,27 @@ export default function CreateProgramPage() {
               {errors.budget && <div className="text-xs text-rose-600 mt-1">{errors.budget}</div>}
             </div>
             <div>
-              <label className="text-xs text-gray-600">Funding Source</label>
-              <select 
-                value={form.funding} 
-                onChange={(e) => handleChange("funding", e.target.value as any)} 
-                className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"
-              >
-                <option value="RED_BOOK">Red Book</option>
-                <option value="EXECUTIVE">Executive</option>
-                <option value="OTHER">Other</option>
-              </select>
+              <label className="text-xs text-gray-600">Funding Source *</label>
+              <div className="relative mt-1">
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <select 
+                  value={form.fundingSourceId} 
+                  onChange={(e) => handleChange("fundingSourceId", e.target.value)} 
+                  className={`w-full appearance-none rounded-xl border bg-white px-3 py-2 text-sm ${errors.fundingSourceId ? 'border-rose-300' : ''}`}
+                >
+                  <option value="">Select Funding Source</option>
+                  {fundingSources.length === 0 ? (
+                    <option value="" disabled>Loading funding sources...</option>
+                  ) : (
+                    fundingSources.map((source) => (
+                      <option key={source.id} value={source.id}>
+                        {source.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              {errors.fundingSourceId && <div className="text-xs text-rose-600 mt-1">{errors.fundingSourceId}</div>}
             </div>
             <div className="md:col-span-2">
               <label className="text-xs text-gray-600">Description</label>

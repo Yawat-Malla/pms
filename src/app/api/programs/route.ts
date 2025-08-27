@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma, ensureDbExists } from "@/lib/prisma";
 import { z } from "zod";
-
-// Create a single Prisma instance
-const prisma = new PrismaClient();
 
 // Validation schema for program creation
 const createProgramSchema = z.object({
   code: z.string().min(1, "Program code is required"),
   name: z.string().min(1, "Program name is required"),
-  fiscalYear: z.string().min(1, "Fiscal year is required"),
+  fiscalYearId: z.string().min(1, "Fiscal year is required"),
   wardId: z.string().min(1, "Ward is required"),
   budget: z.string().optional(),
-  fundingSource: z.enum(["RED_BOOK", "EXECUTIVE", "OTHER"]).default("RED_BOOK"),
-  programType: z.enum(["NEW", "CARRIED_OVER", "EXTENSION"]).default("NEW"),
+  fundingSourceId: z.string().min(1, "Funding source is required"),
+  programTypeId: z.string().min(1, "Program type is required"),
   description: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -48,6 +45,42 @@ export async function POST(request: NextRequest) {
     if (!ward) {
       return NextResponse.json(
         { error: "Ward not found" },
+        { status: 400 }
+      );
+    }
+    
+    // Check if fiscal year exists
+    const fiscalYear = await prisma.fiscalYear.findUnique({
+      where: { id: validatedData.fiscalYearId }
+    });
+    
+    if (!fiscalYear) {
+      return NextResponse.json(
+        { error: "Fiscal year not found" },
+        { status: 400 }
+      );
+    }
+    
+    // Check if program type exists
+    const programType = await prisma.programType.findUnique({
+      where: { id: validatedData.programTypeId }
+    });
+    
+    if (!programType) {
+      return NextResponse.json(
+        { error: "Program type not found" },
+        { status: 400 }
+      );
+    }
+    
+    // Check if funding source exists
+    const fundingSource = await prisma.fundingSource.findUnique({
+      where: { id: validatedData.fundingSourceId }
+    });
+    
+    if (!fundingSource) {
+      return NextResponse.json(
+        { error: "Funding source not found" },
         { status: 400 }
       );
     }
@@ -93,11 +126,14 @@ export async function POST(request: NextRequest) {
       data: {
         code: validatedData.code,
         name: validatedData.name,
-        fiscalYear: validatedData.fiscalYear,
+        fiscalYear: fiscalYear.year, // Store the year string for backward compatibility
         wardId: validatedData.wardId,
         budget: budgetDecimal,
-        fundingSource: validatedData.fundingSource,
-        programType: validatedData.programType,
+        fundingSource: fundingSource.code, // Store the code for backward compatibility
+        programType: programType.code, // Store the code for backward compatibility
+        fiscalYearId: validatedData.fiscalYearId, // Store the relation to fiscal year
+        fundingSourceId: validatedData.fundingSourceId, // Store the relation to funding source
+        programTypeId: validatedData.programTypeId, // Store the relation to program type
         description: validatedData.description,
         startDate,
         endDate,
@@ -109,6 +145,9 @@ export async function POST(request: NextRequest) {
       },
       include: {
         ward: true,
+        fiscalYear: true,
+        programType: true,
+        fundingSource: true,
       }
     });
     
@@ -139,10 +178,16 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
+    // Ensure database exists before querying
+    await ensureDbExists();
+    
     const programs = await prisma.program.findMany({
       include: {
         ward: true,
         createdBy: true,
+        fiscalYear: true,
+        programType: true,
+        fundingSource: true,
       },
       orderBy: {
         createdAt: "desc"
@@ -158,4 +203,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-} 
+}

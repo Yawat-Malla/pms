@@ -21,16 +21,37 @@ enum ProgramStatus {
   ARCHIVED
 }
 
-enum ProgramType {
-  NEW
-  CARRIED_OVER
-  EXTENSION
+model ProgramType {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique
+  programs  Program[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([code])
 }
 
-enum FundingSource {
-  RED_BOOK
-  EXECUTIVE
-  OTHER
+model FundingSource {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique
+  programs  Program[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([code])
+}
+
+model FiscalYear {
+  id        String    @id @default(cuid())
+  year      String    @unique
+  isActive  Boolean   @default(false)
+  programs  Program[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([year])
 }
 
 model Ward {
@@ -79,11 +100,14 @@ model Program {
   id            String         @id @default(cuid())
   code          String         @unique
   name          String
-  fiscalYear    String
+  fiscalYear    FiscalYear     @relation(fields: [fiscalYearId], references: [id])
+  fiscalYearId  String
   sector        String?
   budget        Decimal?       @db.Decimal(14,2)
-  fundingSource FundingSource  @default(RED_BOOK)
-  programType   ProgramType    @default(NEW)
+  fundingSource FundingSource  @relation(fields: [fundingSourceId], references: [id])
+  fundingSourceId String
+  programType   ProgramType    @relation(fields: [programTypeId], references: [id])
+  programTypeId String
   description   String?
   startDate     DateTime?
   endDate       DateTime?
@@ -106,7 +130,9 @@ model Program {
   @@index([code])
   @@index([wardId])
   @@index([status])
-  @@index([fiscalYear])
+  @@index([fiscalYearId])
+  @@index([fundingSourceId])
+  @@index([programTypeId])
   @@index([createdById])
 }
 

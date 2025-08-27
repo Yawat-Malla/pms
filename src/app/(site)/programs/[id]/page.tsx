@@ -1,5 +1,6 @@
 "use client";
 import { useParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import Shell from "@/components/layout/Shell";
 import { Card } from "@/components/ui/Card";
 import { RecentWork } from "@/components/widgets/RecentWork";
@@ -9,29 +10,80 @@ import { motion } from "framer-motion";
 import { Edit, Trash2, Download, Calendar, Building2, DollarSign, User, Clock, FileText, Upload, MessageSquare, Link as LinkIcon, Eye, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { HydrationSafe } from "@/components/ui/HydrationSafe";
 
+interface Program {
+  id: string;
+  code: string;
+  name: string;
+  ward: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  fiscalYear: {
+    id: string;
+    year: string;
+    isActive: boolean;
+  };
+  fiscalYearId: string;
+  programType: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  programTypeId: string;
+  fundingSource: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  fundingSourceId: string;
+  budget: number | null;
+  status: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  responsibleOfficer: string;
+  tags: string[];
+  createdBy?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
 export default function ProgramDetailsPage() {
   const params = useParams();
   const programId = params.id;
+  const [program, setProgram] = useState<Program | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Fetch program data from API
+  useEffect(() => {
+    const fetchProgram = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/programs/${programId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setProgram(data.program);
+        } else {
+          setError('Failed to fetch program details');
+        }
+      } catch (error) {
+        console.error('Error fetching program details:', error);
+        setError('Network error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Demo data - in real app, fetch from API
-  const program = {
-    id: programId,
-    code: "PRG-2025-0001",
-    name: "Road Maintenance and Upgradation Project",
-    ward: { code: "12", name: "Central East Ward" },
-    fiscalYear: "2025/26",
-    status: "MONITORING",
-    budget: 2500000,
-    expenditure: 1800000,
-    startDate: "2025-01-01",
-    endDate: "2025-12-31",
-    implementingAgency: "Municipal Engineering Department",
-    contractor: "ABC Construction Ltd.",
-    approvalStage: "Technical Verification",
-    description: "Comprehensive road maintenance and upgrading project covering major arterial roads in Ward 12. Includes resurfacing, drainage improvements, and safety enhancements.",
-    responsibleOfficer: "Planning Officer",
-    tags: ["road", "maintenance", "infrastructure", "safety"]
-  };
+    if (programId) {
+      fetchProgram();
+    }
+  }, [programId]);
+  
+  // Demo data for expenditure - in real app, fetch from API
+  const expenditure = 1800000;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -54,7 +106,36 @@ export default function ProgramDetailsPage() {
     return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  const progressPercentage = program.budget ? Math.round((program.expenditure / program.budget) * 100) : 0;
+  const progressPercentage = program?.budget ? Math.round((expenditure / program.budget) * 100) : 0;
+
+  if (loading) {
+    return (
+      <Shell>
+        <Card>
+          <div className="p-8 text-center">
+            <div className="animate-pulse flex flex-col items-center">
+              <div className="h-8 w-64 bg-gray-200 rounded mb-4"></div>
+              <div className="h-4 w-48 bg-gray-200 rounded mb-2"></div>
+              <div className="h-4 w-32 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+        </Card>
+      </Shell>
+    );
+  }
+
+  if (error || !program) {
+    return (
+      <Shell>
+        <Card>
+          <div className="p-8 text-center">
+            <div className="text-xl font-semibold text-red-500 mb-2">Error</div>
+            <div className="text-gray-600">{error || 'Program not found'}</div>
+          </div>
+        </Card>
+      </Shell>
+    );
+  }
 
   return (
     <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
@@ -69,7 +150,7 @@ export default function ProgramDetailsPage() {
             </div>
             <div className="text-2xl font-bold mb-2">{program.name}</div>
             <div className="text-sm text-gray-600 mb-3">
-              Ward {program.ward.code} - {program.ward.name} • FY {program.fiscalYear} • {program.code}
+              Ward {program.ward.code} - {program.ward.name} • FY {program.fiscalYear?.year} • {program.code}
             </div>
             <div className="text-sm text-gray-700">{program.description}</div>
           </div>
@@ -116,7 +197,7 @@ export default function ProgramDetailsPage() {
               <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${progressPercentage}%` }}></div>
             </div>
             <div className="text-xs text-gray-500">
-              {progressPercentage}% spent • Rs. {program.expenditure?.toLocaleString()} used
+              {progressPercentage}% spent • Rs. {expenditure.toLocaleString()} used
             </div>
           </div>
         </Card>
@@ -131,13 +212,13 @@ export default function ProgramDetailsPage() {
                 <div className="text-xs text-gray-500">Timeline</div>
                 <div className="font-medium">
                   <HydrationSafe>
-                    {new Date(program.startDate).toLocaleDateString()}
+                    {program.startDate ? new Date(program.startDate).toLocaleDateString() : 'Not set'}
                   </HydrationSafe>
                 </div>
               </div>
             </div>
             <div className="text-xs text-gray-500">
-              to <HydrationSafe>{new Date(program.endDate).toLocaleDateString()}</HydrationSafe>
+              to <HydrationSafe>{program.endDate ? new Date(program.endDate).toLocaleDateString() : 'Not set'}</HydrationSafe>
             </div>
           </div>
         </Card>
@@ -149,12 +230,12 @@ export default function ProgramDetailsPage() {
                 <Building2 className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <div className="text-xs text-gray-500">Implementing Agency</div>
-                <div className="font-medium text-sm">{program.implementingAgency}</div>
+                <div className="text-xs text-gray-500">Program Type</div>
+                <div className="font-medium text-sm">{program.programType?.name}</div>
               </div>
             </div>
             <div className="text-xs text-gray-500">
-              Contractor: {program.contractor}
+              Funding: {program.fundingSource?.name}
             </div>
           </div>
         </Card>
@@ -166,12 +247,12 @@ export default function ProgramDetailsPage() {
                 <User className="h-5 w-5 text-orange-600" />
               </div>
               <div>
-                <div className="text-xs text-gray-500">Approval Stage</div>
-                <div className="font-medium text-sm">{program.approvalStage}</div>
+                <div className="text-xs text-gray-500">Responsible Officer</div>
+                <div className="font-medium text-sm">{program.responsibleOfficer || 'Not assigned'}</div>
               </div>
             </div>
             <div className="text-xs text-gray-500">
-              Officer: {program.responsibleOfficer}
+              Created by: {program.createdBy?.name || 'System'}
             </div>
           </div>
         </Card>

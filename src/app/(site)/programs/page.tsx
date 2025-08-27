@@ -18,7 +18,24 @@ interface Program {
     code: string;
     name: string;
   };
-  fiscalYear: string;
+  fiscalYear: {
+    id: string;
+    year: string;
+    isActive: boolean;
+  };
+  fiscalYearId: string;
+  programType: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  programTypeId: string;
+  fundingSource: {
+    id: string;
+    name: string;
+    code: string;
+  };
+  fundingSourceId: string;
   budget: number | null;
   status: string;
   createdBy: {
@@ -234,20 +251,24 @@ export default function ProgramsPage() {
                   <div className="text-xs text-gray-500">{program.code}</div>
                 </div>
                 <div className="space-y-2 text-xs text-gray-600">
-                  <div className="flex items-center justify-between">
-                    <span>Ward:</span>
-                    <span className="font-medium">{program.ward.code}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>FY:</span>
-                    <span className="font-medium">{program.fiscalYear}</span>
-                  </div>
-                  {program.budget && (
                     <div className="flex items-center justify-between">
-                      <span>Budget:</span>
-                      <span className="font-medium">Rs. {program.budget.toLocaleString()}</span>
+                      <span>Ward:</span>
+                      <span className="font-medium">{program.ward.code}</span>
                     </div>
-                  )}
+                    <div className="flex items-center justify-between">
+                      <span>FY:</span>
+                      <span className="font-medium">{program.fiscalYear?.year}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Type:</span>
+                      <span className="font-medium">{program.programType?.name}</span>
+                    </div>
+                    {program.budget && (
+                      <div className="flex items-center justify-between">
+                        <span>Budget:</span>
+                        <span className="font-medium">Rs. {program.budget.toLocaleString()}</span>
+                      </div>
+                    )}
                   <div className="flex items-center justify-between">
                     <span>Updated:</span>
                     <span className="font-medium">
@@ -276,6 +297,7 @@ export default function ProgramsPage() {
                   <th className="p-4 text-left text-xs font-medium text-gray-500">Name</th>
                   <th className="p-4 text-left text-xs font-medium text-gray-500">Ward</th>
                   <th className="p-4 text-left text-xs font-medium text-gray-500">Fiscal Year</th>
+                  <th className="p-4 text-left text-xs font-medium text-gray-500">Program Type</th>
                   <th className="p-4 text-left text-xs font-medium text-gray-500">Budget</th>
                   <th className="p-4 text-left text-xs font-medium text-gray-500">Status</th>
                   <th className="p-4 text-left text-xs font-medium text-gray-500">Last Updated</th>
@@ -288,7 +310,8 @@ export default function ProgramsPage() {
                     <td className="p-4 text-sm font-medium">{program.code}</td>
                     <td className="p-4 text-sm">{program.name}</td>
                     <td className="p-4 text-sm">Ward {program.ward.code}</td>
-                    <td className="p-4 text-sm">{program.fiscalYear}</td>
+                    <td className="p-4">{program.fiscalYear?.year}</td>
+                    <td className="p-4 text-sm">{program.programType?.name}</td>
                     <td className="p-4 text-sm">
                       {program.budget ? `Rs. ${program.budget.toLocaleString()}` : '-'}
                     </td>

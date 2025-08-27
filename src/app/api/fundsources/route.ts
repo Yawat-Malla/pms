@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma, ensureDbExists } from "@/lib/prisma";
 
-// GET all wards
+// GET all funding sources
 export async function GET() {
   try {
     // Ensure database exists before querying
     await ensureDbExists();
     
-    const wards = await prisma.ward.findMany({
+    const fundingSources = await prisma.fundingSource.findMany({
       orderBy: {
-        code: "asc"
+        name: "asc"
       }
     });
     
-    return NextResponse.json({ wards });
+    return NextResponse.json({ fundingSources });
     
   } catch (error) {
-    console.error("Error fetching wards:", error);
+    console.error("Error fetching funding sources:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -24,7 +24,7 @@ export async function GET() {
   }
 }
 
-// POST - Create a new ward
+// POST - Create a new funding source
 export async function POST(request: Request) {
   try {
     await ensureDbExists();
@@ -47,8 +47,8 @@ export async function POST(request: Request) {
       );
     }
     
-    // Check if ward already exists
-    const existingWard = await prisma.ward.findFirst({
+    // Check if funding source already exists
+    const existingFundingSource = await prisma.fundingSource.findFirst({
       where: {
         OR: [
           { name },
@@ -57,25 +57,25 @@ export async function POST(request: Request) {
       }
     });
     
-    if (existingWard) {
+    if (existingFundingSource) {
       return NextResponse.json(
-        { error: "Ward with this name or code already exists" },
+        { error: "Funding source with this name or code already exists" },
         { status: 400 }
       );
     }
     
-    // Create the ward
-    const ward = await prisma.ward.create({
+    // Create the funding source
+    const fundingSource = await prisma.fundingSource.create({
       data: {
         name,
         code
       }
     });
     
-    return NextResponse.json({ ward }, { status: 201 });
+    return NextResponse.json({ fundingSource }, { status: 201 });
     
   } catch (error) {
-    console.error("Error creating ward:", error);
+    console.error("Error creating funding source:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   }
 }
 
-// PUT - Update a ward
+// PUT - Update a funding source
 export async function PUT(request: Request) {
   try {
     await ensureDbExists();
@@ -94,26 +94,26 @@ export async function PUT(request: Request) {
     // Validation
     if (!id) {
       return NextResponse.json(
-        { error: "Ward ID is required" },
+        { error: "Funding source ID is required" },
         { status: 400 }
       );
     }
     
-    // Check if ward exists
-    const existingWard = await prisma.ward.findUnique({
+    // Check if funding source exists
+    const existingFundingSource = await prisma.fundingSource.findUnique({
       where: { id }
     });
     
-    if (!existingWard) {
+    if (!existingFundingSource) {
       return NextResponse.json(
-        { error: "Ward not found" },
+        { error: "Funding source not found" },
         { status: 404 }
       );
     }
     
-    // Check if name or code already exists for another ward
+    // Check if name or code already exists for another funding source
     if (name || code) {
-      const duplicateWard = await prisma.ward.findFirst({
+      const duplicateFundingSource = await prisma.fundingSource.findFirst({
         where: {
           OR: [
             name ? { name } : {},
@@ -123,16 +123,16 @@ export async function PUT(request: Request) {
         }
       });
       
-      if (duplicateWard) {
+      if (duplicateFundingSource) {
         return NextResponse.json(
-          { error: "Another ward with this name or code already exists" },
+          { error: "Another funding source with this name or code already exists" },
           { status: 400 }
         );
       }
     }
     
-    // Update the ward
-    const updatedWard = await prisma.ward.update({
+    // Update the funding source
+    const updatedFundingSource = await prisma.fundingSource.update({
       where: { id },
       data: {
         name: name || undefined,
@@ -140,10 +140,10 @@ export async function PUT(request: Request) {
       }
     });
     
-    return NextResponse.json({ ward: updatedWard });
+    return NextResponse.json({ fundingSource: updatedFundingSource });
     
   } catch (error) {
-    console.error("Error updating ward:", error);
+    console.error("Error updating funding source:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -151,7 +151,7 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE - Delete a ward
+// DELETE - Delete a funding source
 export async function DELETE(request: Request) {
   try {
     await ensureDbExists();
@@ -161,41 +161,41 @@ export async function DELETE(request: Request) {
     
     if (!id) {
       return NextResponse.json(
-        { error: "Ward ID is required" },
+        { error: "Funding source ID is required" },
         { status: 400 }
       );
     }
     
-    // Check if ward exists
-    const existingWard = await prisma.ward.findUnique({
+    // Check if funding source exists
+    const existingFundingSource = await prisma.fundingSource.findUnique({
       where: { id },
       include: { programs: { select: { id: true } } }
     });
     
-    if (!existingWard) {
+    if (!existingFundingSource) {
       return NextResponse.json(
-        { error: "Ward not found" },
+        { error: "Funding source not found" },
         { status: 404 }
       );
     }
     
-    // Check if ward is in use
-    if (existingWard.programs.length > 0) {
+    // Check if funding source is in use
+    if (existingFundingSource.programs.length > 0) {
       return NextResponse.json(
-        { error: "Cannot delete ward that is in use by programs" },
+        { error: "Cannot delete funding source that is in use by programs" },
         { status: 400 }
       );
     }
     
-    // Delete the ward
-    await prisma.ward.delete({
+    // Delete the funding source
+    await prisma.fundingSource.delete({
       where: { id }
     });
     
     return NextResponse.json({ success: true });
     
   } catch (error) {
-    console.error("Error deleting ward:", error);
+    console.error("Error deleting funding source:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

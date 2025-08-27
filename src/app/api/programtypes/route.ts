@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma, ensureDbExists } from "@/lib/prisma";
 
-// GET all wards
+// GET all program types
 export async function GET() {
   try {
     // Ensure database exists before querying
     await ensureDbExists();
     
-    const wards = await prisma.ward.findMany({
+    const programTypes = await prisma.programType.findMany({
       orderBy: {
-        code: "asc"
+        name: "asc"
       }
     });
     
-    return NextResponse.json({ wards });
+    return NextResponse.json({ programTypes });
     
   } catch (error) {
-    console.error("Error fetching wards:", error);
+    console.error("Error fetching program types:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -24,7 +24,7 @@ export async function GET() {
   }
 }
 
-// POST - Create a new ward
+// POST - Create a new program type
 export async function POST(request: Request) {
   try {
     await ensureDbExists();
@@ -47,8 +47,8 @@ export async function POST(request: Request) {
       );
     }
     
-    // Check if ward already exists
-    const existingWard = await prisma.ward.findFirst({
+    // Check if program type already exists
+    const existingProgramType = await prisma.programType.findFirst({
       where: {
         OR: [
           { name },
@@ -57,25 +57,25 @@ export async function POST(request: Request) {
       }
     });
     
-    if (existingWard) {
+    if (existingProgramType) {
       return NextResponse.json(
-        { error: "Ward with this name or code already exists" },
+        { error: "Program type with this name or code already exists" },
         { status: 400 }
       );
     }
     
-    // Create the ward
-    const ward = await prisma.ward.create({
+    // Create the program type
+    const programType = await prisma.programType.create({
       data: {
         name,
         code
       }
     });
     
-    return NextResponse.json({ ward }, { status: 201 });
+    return NextResponse.json({ programType }, { status: 201 });
     
   } catch (error) {
-    console.error("Error creating ward:", error);
+    console.error("Error creating program type:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   }
 }
 
-// PUT - Update a ward
+// PUT - Update a program type
 export async function PUT(request: Request) {
   try {
     await ensureDbExists();
@@ -94,26 +94,26 @@ export async function PUT(request: Request) {
     // Validation
     if (!id) {
       return NextResponse.json(
-        { error: "Ward ID is required" },
+        { error: "Program type ID is required" },
         { status: 400 }
       );
     }
     
-    // Check if ward exists
-    const existingWard = await prisma.ward.findUnique({
+    // Check if program type exists
+    const existingProgramType = await prisma.programType.findUnique({
       where: { id }
     });
     
-    if (!existingWard) {
+    if (!existingProgramType) {
       return NextResponse.json(
-        { error: "Ward not found" },
+        { error: "Program type not found" },
         { status: 404 }
       );
     }
     
-    // Check if name or code already exists for another ward
+    // Check if name or code already exists for another program type
     if (name || code) {
-      const duplicateWard = await prisma.ward.findFirst({
+      const duplicateProgramType = await prisma.programType.findFirst({
         where: {
           OR: [
             name ? { name } : {},
@@ -123,16 +123,16 @@ export async function PUT(request: Request) {
         }
       });
       
-      if (duplicateWard) {
+      if (duplicateProgramType) {
         return NextResponse.json(
-          { error: "Another ward with this name or code already exists" },
+          { error: "Another program type with this name or code already exists" },
           { status: 400 }
         );
       }
     }
     
-    // Update the ward
-    const updatedWard = await prisma.ward.update({
+    // Update the program type
+    const updatedProgramType = await prisma.programType.update({
       where: { id },
       data: {
         name: name || undefined,
@@ -140,10 +140,10 @@ export async function PUT(request: Request) {
       }
     });
     
-    return NextResponse.json({ ward: updatedWard });
+    return NextResponse.json({ programType: updatedProgramType });
     
   } catch (error) {
-    console.error("Error updating ward:", error);
+    console.error("Error updating program type:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -151,7 +151,7 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE - Delete a ward
+// DELETE - Delete a program type
 export async function DELETE(request: Request) {
   try {
     await ensureDbExists();
@@ -161,41 +161,41 @@ export async function DELETE(request: Request) {
     
     if (!id) {
       return NextResponse.json(
-        { error: "Ward ID is required" },
+        { error: "Program type ID is required" },
         { status: 400 }
       );
     }
     
-    // Check if ward exists
-    const existingWard = await prisma.ward.findUnique({
+    // Check if program type exists
+    const existingProgramType = await prisma.programType.findUnique({
       where: { id },
       include: { programs: { select: { id: true } } }
     });
     
-    if (!existingWard) {
+    if (!existingProgramType) {
       return NextResponse.json(
-        { error: "Ward not found" },
+        { error: "Program type not found" },
         { status: 404 }
       );
     }
     
-    // Check if ward is in use
-    if (existingWard.programs.length > 0) {
+    // Check if program type is in use
+    if (existingProgramType.programs.length > 0) {
       return NextResponse.json(
-        { error: "Cannot delete ward that is in use by programs" },
+        { error: "Cannot delete program type that is in use by programs" },
         { status: 400 }
       );
     }
     
-    // Delete the ward
-    await prisma.ward.delete({
+    // Delete the program type
+    await prisma.programType.delete({
       where: { id }
     });
     
     return NextResponse.json({ success: true });
     
   } catch (error) {
-    console.error("Error deleting ward:", error);
+    console.error("Error deleting program type:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
