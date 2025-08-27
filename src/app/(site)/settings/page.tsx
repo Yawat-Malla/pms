@@ -68,25 +68,25 @@ type FundingSource = {
 async function getJSON<T extends Record<string, unknown>>(
   url: string,
   key: keyof T
-): Promise<any> {
+): Promise<T[keyof T]> {
   const res = await fetch(url, { cache: "no-store" });
   const text = await res.text();
   if (!res.ok) {
     console.error(`[GET ${url}] ${res.status}`, text);
     throw new Error(`GET ${url} failed`);
   }
-  let json: any;
+  let json: Record<string, unknown>;
   try {
     json = JSON.parse(text);
   } catch {
     console.error(`[GET ${url}] non-JSON:`, text);
     throw new Error("Non-JSON response");
   }
-  if (!(key in json)) {
+  if (!(String(key) in json)) {
     console.error(`[GET ${url}] missing key "${String(key)}"`, json);
     throw new Error(`Missing key ${String(key)}`);
   }
-  return json[key];
+  return json[String(key)] as T[keyof T];
 }
 
 // =================== PAGE ===================
@@ -196,7 +196,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateFiscalYear = async (data: any) => {
+  const handleUpdateFiscalYear = async (data: Record<string, unknown>) => {
     try {
       if (!data?.id) return toast.error("Missing ID");
       if (!String(data.year ?? "").trim()) return toast.error("Fiscal year is required");
@@ -245,10 +245,10 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateWard = async (data: any) => {
+  const handleUpdateWard = async (data: Record<string, unknown>) => {
     try {
       if (!data?.id) return toast.error("Missing ID");
-      if (!data.name.trim() || !data.code.trim())
+      if (!String(data.name || "").trim() || !String(data.code || "").trim())
         return toast.error("Ward name and code are required");
       const res = await fetch("/api/wards", {
         method: "PUT",
@@ -295,10 +295,10 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateProgramType = async (data: any) => {
+  const handleUpdateProgramType = async (data: Record<string, unknown>) => {
     try {
       if (!data?.id) return toast.error("Missing ID");
-      if (!data.name.trim() || !data.code.trim())
+      if (!String(data.name || "").trim() || !String(data.code || "").trim())
         return toast.error("Program type name and code are required");
       const res = await fetch("/api/programtypes", {
         method: "PUT",
@@ -345,10 +345,10 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateFundingSource = async (data: any) => {
+  const handleUpdateFundingSource = async (data: Record<string, unknown>) => {
     try {
       if (!data?.id) return toast.error("Missing ID");
-      if (!data.name.trim() || !data.code.trim())
+      if (!String(data.name || "").trim() || !String(data.code || "").trim())
         return toast.error("Funding source name and code are required");
       const res = await fetch("/api/fundsources", {
         method: "PUT",

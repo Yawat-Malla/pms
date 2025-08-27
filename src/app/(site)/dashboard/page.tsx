@@ -1,95 +1,190 @@
 "use client";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import Shell from "@/components/layout/Shell";
 import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
 import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
-import { Plus, Upload, CheckCircle2, Clock, ListChecks, Files, DollarSign, TrendingUp, AlertTriangle, Calendar, Eye, ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
+import { Plus, CheckCircle2, Clock, ListChecks, Files, DollarSign, TrendingUp, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { HydrationSafe } from "@/components/ui/HydrationSafe";
+
+interface DashboardStats {
+  totalPrograms: {
+    value: number;
+    change: string;
+    changeType: "positive" | "negative" | "neutral";
+  };
+  pendingApprovals: {
+    value: number;
+    change: string;
+    changeType: "positive" | "negative" | "neutral";
+  };
+  budget: {
+    allocated: number;
+    spent: number;
+    percentage: number;
+    formattedAllocated: string;
+    formattedSpent: string;
+  };
+  pendingPayments: {
+    count: number;
+    amount: number;
+    formattedAmount: string;
+  };
+  fiscalYear: string;
+}
+
+interface WardStat {
+  ward: string;
+  wardName: string;
+  programs: number;
+  budget: string;
+  spent: string;
+  budgetRaw: number;
+  spentRaw: number;
+  spentPercentage: number;
+}
+
+interface ActivityLog {
+  id: string;
+  action: string;
+  description: string;
+  time: string;
+  type: string;
+  user: string;
+  link: string;
+}
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  priority: string;
+  timeAgo: string;
+}
 
 export default function DashboardPage() {
-  const stats = [
-    { 
-      label: "Total Programs (FY 2025/26)", 
-      value: 128, 
-      icon: Files, 
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [wardStats, setWardStats] = useState<WardStat[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch all dashboard data in parallel
+        const [statsRes, wardStatsRes, activityRes, notificationsRes] = await Promise.all([
+          fetch('/api/dashboard/stats'),
+          fetch('/api/dashboard/ward-stats'),
+          fetch('/api/activity-logs?limit=5'),
+          fetch('/api/notifications?limit=3&isRead=false')
+        ]);
+
+        if (statsRes.ok) {
+          const data = await statsRes.json();
+          setStats(data.stats);
+        }
+
+        if (wardStatsRes.ok) {
+          const data = await wardStatsRes.json();
+          setWardStats(data.wardStats || []);
+        }
+
+        if (activityRes.ok) {
+          const data = await activityRes.json();
+          setActivityLogs(data.activityLogs || []);
+        }
+
+        if (notificationsRes.ok) {
+          const data = await notificationsRes.json();
+          setNotifications(data.notifications || []);
+        }
+
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        setError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (loading) {
+    return (
+      <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
+        <Card>
+          <div className="flex items-center justify-center p-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <span className="ml-2 text-gray-600">Loading dashboard...</span>
+          </div>
+        </Card>
+      </Shell>
+    );
+  }
+
+  if (error) {
+    return (
+      <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
+        <Card>
+          <div className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <div className="text-red-600 mb-2">Error loading dashboard</div>
+              <div className="text-sm text-gray-600">{error}</div>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 rounded-xl bg-gray-900 px-4 py-2 text-sm text-white"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </Card>
+      </Shell>
+    );
+  }
+  const dashboardStats = stats ? [
+    {
+      label: `Total Programs (${stats.fiscalYear})`,
+      value: stats.totalPrograms.value,
+      icon: Files,
       tone: "from-indigo-100 to-indigo-50",
-      change: "+12%",
-      changeType: "positive"
+      change: stats.totalPrograms.change,
+      changeType: stats.totalPrograms.changeType
     },
-    { 
-      label: "Pending Approval", 
-      value: 23, 
-      icon: Clock, 
+    {
+      label: "Pending Approval",
+      value: stats.pendingApprovals.value,
+      icon: Clock,
       tone: "from-amber-100 to-amber-50",
-      change: "+5",
-      changeType: "negative"
+      change: stats.pendingApprovals.change,
+      changeType: stats.pendingApprovals.changeType
     },
-    { 
-      label: "Budget vs Spent", 
-      value: "Rs. 45.2M", 
-      icon: DollarSign, 
+    {
+      label: "Budget vs Spent",
+      value: stats.budget.formattedSpent,
+      icon: DollarSign,
       tone: "from-emerald-100 to-emerald-50",
-      progress: 68,
-      subtitle: "Rs. 68.5M allocated"
+      progress: stats.budget.percentage,
+      subtitle: `${stats.budget.formattedAllocated} allocated`
     },
-    { 
-      label: "Payments Pending", 
-      value: 34, 
-      icon: TrendingUp, 
+    {
+      label: "Payments Pending",
+      value: stats.pendingPayments.count,
+      icon: TrendingUp,
       tone: "from-violet-100 to-violet-50",
-      change: "Rs. 12.3M",
-      changeType: "neutral"
+      change: stats.pendingPayments.formattedAmount,
+      changeType: "neutral" as const
     },
-  ];
+  ] : [];
 
-  const wardStats = [
-    { ward: "Ward 1", programs: 8, budget: "Rs. 5.2M", spent: "Rs. 3.1M" },
-    { ward: "Ward 2", programs: 12, budget: "Rs. 7.8M", spent: "Rs. 4.9M" },
-    { ward: "Ward 3", programs: 6, budget: "Rs. 4.1M", spent: "Rs. 2.8M" },
-    { ward: "Ward 4", programs: 15, budget: "Rs. 9.3M", spent: "Rs. 6.2M" },
-  ];
 
-  const pendingApprovals = [
-    { id: "PRG-001", name: "Road Maintenance", ward: 5, type: "Program Approval", priority: "high", link: "/programs/PRG-001" },
-    { id: "PRG-002", name: "Water Supply", ward: 3, type: "Contract Review", priority: "medium", link: "/programs/PRG-002" },
-    { id: "PRG-003", name: "School Building", ward: 7, type: "Payment Request", priority: "high", link: "/programs/PRG-003" },
-    { id: "PRG-004", name: "Health Post", ward: 2, type: "Verification", priority: "low", link: "/programs/PRG-004" },
-    { id: "PRG-005", name: "Street Lighting", ward: 9, type: "Committee Minutes", priority: "medium", link: "/programs/PRG-005" },
-  ];
-
-  const recentActivity = [
-    { action: "Ward 5 uploaded Cost Estimation for Road Project", time: "2h ago", type: "upload", link: "/programs/PRG-001" },
-    { action: "Contract for School Building approved by CAO", time: "4h ago", type: "approval", link: "/programs/PRG-003" },
-    { action: "Payment request of Rs. 50,000 rejected by Accounts", time: "6h ago", type: "rejection", link: "/programs/PRG-002" },
-    { action: "Ward 3 submitted Verification Report", time: "8h ago", type: "submission", link: "/programs/PRG-004" },
-    { action: "New program 'Street Lighting' created in Ward 9", time: "1d ago", type: "creation", link: "/programs/PRG-005" },
-  ];
-
-  const activePrograms = [
-    { id: "PRG-001", name: "Road Maintenance - Ward 5", ward: 5, budget: "Rs. 2.5M", status: "Ongoing", progress: 75 },
-    { id: "PRG-002", name: "Water Supply Upgrade - Ward 3", ward: 3, budget: "Rs. 1.8M", status: "Pending", progress: 0 },
-    { id: "PRG-003", name: "School Building - Ward 7", ward: 7, budget: "Rs. 3.2M", status: "Approved", progress: 15 },
-    { id: "PRG-004", name: "Health Post Expansion - Ward 2", ward: 2, budget: "Rs. 1.2M", status: "Ongoing", progress: 45 },
-  ];
-
-  const notifications = [
-    { type: "deadline", message: "Fiscal Year closing in 10 days", priority: "high" },
-    { type: "approval", message: "5 programs awaiting your approval", priority: "medium" },
-    { type: "payment", message: "Payment deadline for Ward 5 tomorrow", priority: "high" },
-  ];
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Ongoing': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'Pending': return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'Approved': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'Completed': return 'bg-violet-50 text-violet-700 border-violet-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
-    }
-  };
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -102,20 +197,11 @@ export default function DashboardPage() {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'text-rose-600 bg-rose-50 border-rose-200';
-      case 'medium': return 'text-amber-600 bg-amber-50 border-amber-200';
-      case 'low': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
-    }
-  };
-
   return (
     <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
       {/* 1. Header / Quick Stats */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {stats.map((s) => (
+        {dashboardStats.map((s) => (
           <Card key={s.label}>
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
@@ -133,7 +219,7 @@ export default function DashboardPage() {
                 <div className="text-2xl font-semibold">{s.value}</div>
                 {s.subtitle && <div className="text-xs text-gray-500">{s.subtitle}</div>}
               </div>
-              {s.progress && (
+              {s.progress !== undefined && (
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div className="bg-emerald-600 h-2 rounded-full" style={{ width: `${s.progress}%` }}></div>
                 </div>
@@ -150,44 +236,66 @@ export default function DashboardPage() {
           <Link href="/programs" className="text-sm text-blue-600 hover:underline">View All</Link>
         </div>
         <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-4">
-          {wardStats.map((ward) => (
+          {wardStats.length > 0 ? wardStats.map((ward) => (
             <div key={ward.ward} className="rounded-lg border p-3">
               <div className="text-sm font-medium mb-2">{ward.ward}</div>
               <div className="space-y-1 text-xs text-gray-600">
                 <div>Programs: {ward.programs}</div>
                 <div>Budget: {ward.budget}</div>
                 <div>Spent: {ward.spent}</div>
+                {ward.spentPercentage > 0 && (
+                  <div className="w-full bg-gray-200 rounded-full h-1 mt-2">
+                    <div
+                      className="bg-blue-600 h-1 rounded-full"
+                      style={{ width: `${Math.min(ward.spentPercentage, 100)}%` }}
+                    ></div>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
+          )) : (
+            <div className="col-span-full text-center text-gray-500 py-8">
+              No ward data available
+            </div>
+          )}
         </div>
       </Card>
 
-      {/* 3. Task/Approval Queue */}
+      {/* 3. Quick Actions */}
       <Card>
         <div className="flex items-center justify-between border-b p-4">
-          <div className="text-lg font-semibold">Your Pending Approvals</div>
-          <Link href="/approvals" className="text-sm text-blue-600 hover:underline">View All</Link>
+          <div className="text-lg font-semibold">Quick Actions</div>
         </div>
         <div className="p-4">
-          <div className="space-y-3">
-            {pendingApprovals.slice(0, 5).map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-amber-400"></div>
-                  <div>
-                    <div className="font-medium text-sm">{item.name}</div>
-                    <div className="text-xs text-gray-500">Ward {item.ward} • {item.type}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-xs ${getPriorityColor(item.priority)}`}>
-                    {item.priority}
-                  </span>
-                  <Link href={item.link} className="text-blue-600 hover:underline text-sm">View</Link>
-                </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <Link href="/programs/new" className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+              <Plus className="h-5 w-5 text-blue-600" />
+              <div>
+                <div className="font-medium text-sm">New Program</div>
+                <div className="text-xs text-gray-500">Create program</div>
               </div>
-            ))}
+            </Link>
+            <Link href="/approvals" className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <div>
+                <div className="font-medium text-sm">Approvals</div>
+                <div className="text-xs text-gray-500">Review pending</div>
+              </div>
+            </Link>
+            <Link href="/reports" className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+              <Files className="h-5 w-5 text-purple-600" />
+              <div>
+                <div className="font-medium text-sm">Reports</div>
+                <div className="text-xs text-gray-500">Generate reports</div>
+              </div>
+            </Link>
+            <Link href="/settings" className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+              <ListChecks className="h-5 w-5 text-gray-600" />
+              <div>
+                <div className="font-medium text-sm">Settings</div>
+                <div className="text-xs text-gray-500">System config</div>
+              </div>
+            </Link>
           </div>
         </div>
       </Card>
@@ -200,50 +308,27 @@ export default function DashboardPage() {
         </div>
         <div className="p-4">
           <div className="space-y-3">
-            {recentActivity.map((activity, i) => (
-              <div key={i} className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded-lg">
+            {activityLogs.length > 0 ? activityLogs.map((activity) => (
+              <div key={activity.id} className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded-lg">
                 <div className="text-lg">{getActivityIcon(activity.type)}</div>
                 <div className="flex-1">
-                  <div className="text-sm">{activity.action}</div>
-                  <div className="text-xs text-gray-500">{activity.time}</div>
+                  <div className="text-sm">{activity.description}</div>
+                  <div className="text-xs text-gray-500">{activity.time} • {activity.user}</div>
                 </div>
                 <Link href={activity.link} className="text-blue-600 hover:underline text-sm">
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      {/* 5. Active Programs */}
-      <Card>
-        <div className="flex items-center justify-between border-b p-4">
-          <div className="text-lg font-semibold">Active Programs</div>
-          <Link href="/programs" className="text-sm text-blue-600 hover:underline">View All</Link>
-        </div>
-        <div className="p-4">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {activePrograms.map((program) => (
-              <div key={program.id} className="border rounded-lg p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-medium text-sm">{program.name}</div>
-                  <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-xs ${getStatusColor(program.status)}`}>
-                    {program.status}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-600 mb-2">Ward {program.ward} • {program.budget}</div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${program.progress}%` }}></div>
-                </div>
-                <div className="text-xs text-gray-500 mt-1">{program.progress}% complete</div>
+            )) : (
+              <div className="text-center text-gray-500 py-8">
+                No recent activity
               </div>
-            ))}
+            )}
           </div>
         </div>
       </Card>
 
-      {/* 6. Notifications & Reminders */}
+      {/* 5. Notifications & Reminders */}
       <Card>
         <div className="flex items-center justify-between border-b p-4">
           <div className="text-lg font-semibold">Notifications & Reminders</div>
@@ -251,15 +336,22 @@ export default function DashboardPage() {
         </div>
         <div className="p-4">
           <div className="space-y-3">
-            {notifications.map((notification, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 border rounded-lg">
+            {notifications.length > 0 ? notifications.map((notification) => (
+              <div key={notification.id} className="flex items-start gap-3 p-3 border rounded-lg">
                 <AlertTriangle className={`h-5 w-5 mt-0.5 ${notification.priority === 'high' ? 'text-rose-500' : notification.priority === 'medium' ? 'text-amber-500' : 'text-emerald-500'}`} />
                 <div className="flex-1">
-                  <div className="text-sm">{notification.message}</div>
-                  <div className="text-xs text-gray-500">Priority: {notification.priority}</div>
+                  <div className="text-sm font-medium">{notification.title}</div>
+                  <div className="text-sm text-gray-600">{notification.message}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {notification.timeAgo} • Priority: {notification.priority}
+                  </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="text-center text-gray-500 py-8">
+                No notifications
+              </div>
+            )}
           </div>
         </div>
       </Card>

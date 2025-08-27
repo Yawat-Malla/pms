@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma, ensureDbExists } from "@/lib/prisma";
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     // Ensure database exists before querying
     await ensureDbExists();
     
-    const programId = params.id;
+    const { id: programId } = await params;
     
     if (!programId) {
       return NextResponse.json(

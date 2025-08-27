@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
     
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation failed", details: error.errors },
+        { error: "Validation failed", details: error.issues },
         { status: 400 }
       );
     }
@@ -176,26 +176,124 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Ensure database exists before querying
     await ensureDbExists();
-    
-    const programs = await prisma.program.findMany({
-      include: {
-        ward: true,
-        createdBy: true,
-        fiscalYear: true,
-        programType: true,
-        fundingSource: true,
-      },
-      orderBy: {
-        createdAt: "desc"
+
+    const { searchParams } = new URL(request.url);
+
+    // Extract query parameters
+    const search = searchParams.get('search');
+    const wardId = searchParams.get('wardId');
+    const fiscalYearId = searchParams.get('fiscalYearId');
+    const status = searchParams.get('status');
+    const programTypeId = searchParams.get('programTypeId');
+    const fundingSourceId = searchParams.get('fundingSourceId');
+    const sortBy = searchParams.get('sortBy') || 'createdAt';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+
+    // Build where clause for filtering
+    const whereClause: Record<string, unknown> = {};
+
+    // Search functionality
+    if (search) {
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { ward: { code: { contains: search, mode: 'insensitive' } } },
+        { ward: { name: { contains: search, mode: 'insensitive' } } }
+      ];
+    }
+
+    // Filter by ward
+    if (wardId) {
+      whereClause.wardId = wardId;
+    }
+
+    // Filter by fiscal year
+    if (fiscalYearId) {
+      whereClause.fiscalYearId = fiscalYearId;
+    }
+
+    // Filter by status
+    if (status) {
+      whereClause.status = status;
+    }
+
+    // Filter by program type
+    if (programTypeId) {
+      whereClause.programTypeId = programTypeId;
+    }
+
+    // Filter by funding source
+    if (fundingSourceId) {
+      whereClause.fundingSourceId = fundingSourceId;
+    }
+
+    // Build order by clause
+    const orderByClause: Record<string, unknown> = {};
+    if (sortBy === 'name') {
+      orderByClause.name = sortOrder;
+    } else if (sortBy === 'ward') {
+      orderByClause.ward = { code: sortOrder };
+    } else if (sortBy === 'budget') {
+      orderByClause.budget = sortOrder;
+    } else if (sortBy === 'status') {
+      orderByClause.status = sortOrder;
+    } else {
+      orderByClause.createdAt = sortOrder;
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Fetch programs with filters and pagination
+    const [programs, totalCount] = await Promise.all([
+      prisma.program.findMany({
+        where: whereClause,
+        include: {
+          ward: true,
+          createdBy: true,
+          fiscalYear: true,
+          programType: true,
+          fundingSource: true,
+          _count: {
+            select: {
+              documents: true,
+              approvals: true,
+              payments: true,
+              monitoring: true
+            }
+          }
+        },
+        orderBy: orderByClause,
+        skip: skip,
+        take: limit
+      }),
+      prisma.program.count({ where: whereClause })
+    ]);
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNextPage = page < totalPages;
+    const hasPreviousPage = page > 1;
+
+    return NextResponse.json({
+      programs,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage
       }
     });
-    
-    return NextResponse.json({ programs });
-    
+
   } catch (error) {
     console.error("Error fetching programs:", error);
     return NextResponse.json(

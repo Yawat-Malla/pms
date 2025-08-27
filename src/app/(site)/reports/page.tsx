@@ -1,29 +1,98 @@
 "use client";
+import { useState, useEffect } from "react";
 import Shell from "@/components/layout/Shell";
 import { Card } from "@/components/ui/Card";
 import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
 import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { motion } from "framer-motion";
-import { Filter, Search, Download, FileText, BarChart3, PieChart, TrendingUp, Calendar, Building2, Eye, Printer, FileSpreadsheet } from "lucide-react";
+import { Filter, Search, Download, FileText, BarChart3, PieChart, TrendingUp, Calendar, Building2, Eye, Printer, FileSpreadsheet, Loader2 } from "lucide-react";
 import { HydrationSafe } from "@/components/ui/HydrationSafe";
 import Link from "next/link";
 
+interface Report {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  filePath?: string;
+  fileSize?: string;
+  parameters: Record<string, unknown>;
+  generatedBy: string;
+  createdAt: string;
+  completedAt?: string;
+  generated: string;
+  downloadUrl?: string;
+}
+
 export default function ReportsPage() {
+  const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState<string | null>(null);
+  useEffect(() => {
+    fetchReports();
+  }, []);
+
+  const fetchReports = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/reports');
+      if (response.ok) {
+        const data = await response.json();
+        setReports(data.reports || []);
+      } else {
+        setError('Failed to fetch reports');
+      }
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      setError('Network error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateReport = async (type: string, name: string) => {
+    try {
+      setGenerating(type);
+      const response = await fetch('/api/reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          type,
+          parameters: {
+            format: 'pdf',
+            includeCharts: true,
+            includeDataTables: true,
+            includeMetadata: true
+          }
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Refresh reports list
+        fetchReports();
+      } else {
+        setError('Failed to generate report');
+      }
+    } catch (error) {
+      console.error('Error generating report:', error);
+      setError('Network error occurred');
+    } finally {
+      setGenerating(null);
+    }
+  };
+
   const reportTypes = [
     { id: "ward", name: "By Ward", icon: Building2, description: "Programs and budget breakdown by ward" },
     { id: "status", name: "By Status", icon: BarChart3, description: "Program status distribution and trends" },
-    { id: "type", name: "By Program Type", icon: PieChart, description: "Analysis by program categories" },
     { id: "timeline", name: "Timeline Reports", icon: TrendingUp, description: "Progress and milestone tracking" },
     { id: "budget", name: "Budget Analysis", icon: FileText, description: "Budget utilization and variance reports" },
     { id: "custom", name: "Custom Reports", icon: Filter, description: "Build your own report criteria" }
-  ];
-
-  const recentReports = [
-    { name: "Ward 12 Monthly Report", type: "Ward Report", generated: "2025-01-15", size: "2.3 MB" },
-    { name: "Q4 Budget Analysis", type: "Budget Report", generated: "2025-01-10", size: "1.8 MB" },
-    { name: "Program Status Summary", type: "Status Report", generated: "2025-01-08", size: "3.1 MB" },
-    { name: "Annual Performance Review", type: "Performance Report", generated: "2025-01-05", size: "4.2 MB" }
   ];
 
   return (
@@ -94,12 +163,21 @@ export default function ReportsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <motion.button 
-                  whileHover={{ y: -1 }} 
-                  whileTap={{ scale: 0.98 }} 
-                  className="flex-1 rounded-xl border px-3 py-2 text-sm hover:bg-gray-50"
+                <motion.button
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => generateReport(report.id, `${report.name} - ${new Date().toLocaleDateString()}`)}
+                  disabled={generating === report.id}
+                  className="flex-1 rounded-xl border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Generate
+                  {generating === report.id ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Generating...
+                    </div>
+                  ) : (
+                    'Generate'
+                  )}
                 </motion.button>
                 <button className="p-2 hover:bg-gray-100 rounded-lg">
                   <Eye className="h-4 w-4 text-gray-600" />
@@ -146,32 +224,61 @@ export default function ReportsPage() {
         </div>
         <div className="p-4">
           <div className="space-y-3">
-            {recentReports.map((report, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <span className="ml-2 text-gray-600">Loading reports...</span>
+              </div>
+            ) : error ? (
+              <div className="text-center py-8">
+                <div className="text-red-600 mb-2">Error loading reports</div>
+                <div className="text-sm text-gray-600">{error}</div>
+                <button
+                  onClick={() => fetchReports()}
+                  className="mt-4 rounded-xl bg-gray-900 px-4 py-2 text-sm text-white"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : reports.length > 0 ? reports.slice(0, 5).map((report) => (
+              <div key={report.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="grid h-8 w-8 place-items-center rounded-lg bg-gray-100">
                     <FileText className="h-4 w-4 text-gray-600" />
                   </div>
                   <div>
                     <div className="font-medium text-sm">{report.name}</div>
-                    <div className="text-xs text-gray-500">{report.type} • {report.size}</div>
+                    <div className="text-xs text-gray-500">
+                      {report.type} • Generated on {report.generated} • {report.generatedBy}
+                      {report.fileSize && ` • ${report.fileSize}`}
+                    </div>
+                    <div className="text-xs">
+                      <span className={`inline-flex items-center rounded-lg px-2 py-1 text-xs ${
+                        report.status === 'completed' ? 'bg-green-50 text-green-700 border-green-200' :
+                        report.status === 'generating' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        'bg-red-50 text-red-700 border-red-200'
+                      }`}>
+                        {report.status}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">
-                    <HydrationSafe>
-                      {new Date(report.generated).toLocaleDateString()}
-                    </HydrationSafe>
-                  </span>
                   <button className="p-1 hover:bg-gray-100 rounded">
                     <Eye className="h-4 w-4 text-gray-600" />
                   </button>
-                  <button className="p-1 hover:bg-gray-100 rounded">
-                    <Download className="h-4 w-4 text-gray-600" />
-                  </button>
+                  {report.downloadUrl && (
+                    <a href={report.downloadUrl} className="p-1 hover:bg-gray-100 rounded">
+                      <Download className="h-4 w-4 text-gray-600" />
+                    </a>
+                  )}
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="text-center py-8 text-gray-500">
+                No reports generated yet
+              </div>
+            )}
           </div>
         </div>
       </Card>

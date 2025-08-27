@@ -19,7 +19,7 @@ export async function ensureDbExists() {
     await prisma.$queryRaw`SELECT 1`;
     console.log('Database connection successful');
     return true;
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error.message.includes('database "pms_db" does not exist')) {
       console.error('Database does not exist. Please create it manually.');
     } else {

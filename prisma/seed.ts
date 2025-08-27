@@ -120,14 +120,24 @@ async function main() {
         create: {
           code: programData.code,
           name: programData.name,
-          fiscalYear: programData.fiscalYear,
+          fiscalYear: {
+            connect: { id: programData.fiscalYear }
+          },
           budget: programData.budget,
-          fundingSource: programData.fundingSource,
-          programType: programData.programType,
+          fundingSource: {
+            connect: { id: programData.fundingSource }
+          },
+          programType: {
+            connect: { id: programData.programType }
+          },
           description: programData.description,
-          status: programData.status,
-          wardId: ward.id,
-          createdById: programData.createdById,
+          status: programData.status as any,
+          ward: {
+            connect: { id: ward.id }
+          },
+          createdBy: {
+            connect: { id: programData.createdById }
+          },
           tags: programData.tags,
           responsibleOfficer: programData.responsibleOfficer,
         },

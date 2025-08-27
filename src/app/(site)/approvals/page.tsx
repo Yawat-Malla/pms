@@ -1,76 +1,144 @@
 "use client";
+import { useState, useEffect, useCallback } from "react";
 import Shell from "@/components/layout/Shell";
 import { Card } from "@/components/ui/Card";
 import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
 import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { motion } from "framer-motion";
-import { Filter, Search, Clock, CheckCircle2, XCircle, Upload, Eye, Check, X, Download, MoreHorizontal, Calendar, Building2, FileText, User, ArrowRight } from "lucide-react";
+import { Search, Clock, CheckCircle2, XCircle, Upload, Eye, Check, X, Download, MoreHorizontal, Calendar, Building2, FileText, User, Loader2 } from "lucide-react";
 import { HydrationSafe } from "@/components/ui/HydrationSafe";
 
+interface Approval {
+  id: string;
+  programId: string;
+  programName: string;
+  programCode: string;
+  ward: string;
+  wardName: string;
+  submittedBy: string;
+  submittedDate: string;
+  documentType: string;
+  attachedFiles: string[];
+  remarks: string;
+  status: string;
+  priority: string;
+  step: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  fiscalYear: string;
+  programType: string;
+  budget?: number;
+}
+
 export default function ApprovalsPage() {
-  const DEMO_ITEMS = [
-    {
-      id: "PRG-001",
-      programName: "Road Maintenance - Ward 12",
-      ward: "Ward 12",
-      submittedBy: "Ward Secretary",
-      submittedDate: "2025-01-15",
-      documentType: "Committee Minutes",
-      attachedFiles: ["minutes_2025_01_15.pdf", "photos.zip"],
-      remarks: "",
-      status: "pending",
-      priority: "high"
-    },
-    {
-      id: "PRG-002",
-      programName: "Water Supply Upgrade",
-      ward: "Ward 5",
-      submittedBy: "Technical Head",
-      submittedDate: "2025-01-14",
-      documentType: "Cost Estimation",
-      attachedFiles: ["estimation_detailed.pdf", "technical_drawings.pdf"],
-      remarks: "",
-      status: "pending",
-      priority: "medium"
-    },
-    {
-      id: "PRG-003",
-      programName: "School Renovation Project",
-      ward: "Ward 8",
-      submittedBy: "Planning Officer",
-      submittedDate: "2025-01-13",
-      documentType: "Contract Review",
-      attachedFiles: ["contract_draft.pdf", "vendor_quotes.pdf"],
-      remarks: "",
-      status: "pending",
-      priority: "high"
-    },
-    {
-      id: "PRG-004",
-      programName: "Health Post Expansion",
-      ward: "Ward 2",
-      submittedBy: "Ward Secretary",
-      submittedDate: "2025-01-12",
-      documentType: "Verification Report",
-      attachedFiles: ["verification_report.pdf", "site_photos.pdf"],
-      remarks: "",
-      status: "pending",
-      priority: "low"
-    },
-    {
-      id: "PRG-005",
-      programName: "Street Lighting Installation",
-      ward: "Ward 9",
-      submittedBy: "Technical Head",
-      submittedDate: "2025-01-11",
-      documentType: "Progress Review",
-      attachedFiles: ["progress_report.pdf", "quality_check.pdf"],
-      remarks: "",
-      status: "pending",
-      priority: "medium"
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('pending');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedWard, setSelectedWard] = useState('');
+  const [selectedModule, setSelectedModule] = useState('');
+  const [selectedFiscalYear, setSelectedFiscalYear] = useState('');
+
+  const fetchApprovals = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        status: activeTab,
+        ...(selectedWard && { ward: selectedWard }),
+        ...(selectedModule && { module: selectedModule }),
+        ...(selectedFiscalYear && { fiscalYear: selectedFiscalYear })
+      });
+
+      const response = await fetch(`/api/approvals?${params}`);
+      if (response.ok) {
+        const data = await response.json();
+        setApprovals(data.approvals || []);
+      } else {
+        setError('Failed to fetch approvals');
+      }
+    } catch (error) {
+      console.error('Error fetching approvals:', error);
+      setError('Network error occurred');
+    } finally {
+      setLoading(false);
     }
-  ];
+  }, [activeTab, selectedWard, selectedModule, selectedFiscalYear]);
+
+  useEffect(() => {
+    fetchApprovals();
+  }, [fetchApprovals]);
+
+  const handleApprovalAction = async (approvalId: string, action: 'approve' | 'reject' | 'request_reupload', remarks?: string) => {
+    try {
+      const response = await fetch('/api/approvals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          approvalId,
+          action,
+          remarks,
+          // TODO: Add userId from session
+        }),
+      });
+
+      if (response.ok) {
+        // Refresh the approvals list
+        fetchApprovals();
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to process approval');
+      }
+    } catch (error) {
+      console.error('Error processing approval:', error);
+      setError('Network error occurred');
+    }
+  };
+
+  // Filter approvals based on search query
+  const filteredApprovals = approvals.filter(approval =>
+    approval.programName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    approval.programCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    approval.ward.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    approval.submittedBy.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
+        <Card>
+          <div className="flex items-center justify-center p-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <span className="ml-2 text-gray-600">Loading approvals...</span>
+          </div>
+        </Card>
+      </Shell>
+    );
+  }
+
+  if (error) {
+    return (
+      <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
+        <Card>
+          <div className="flex items-center justify-center p-12">
+            <div className="text-center">
+              <div className="text-red-600 mb-2">Error loading approvals</div>
+              <div className="text-sm text-gray-600">{error}</div>
+              <button
+                onClick={() => fetchApprovals()}
+                className="mt-4 rounded-xl bg-gray-900 px-4 py-2 text-sm text-white"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </Card>
+      </Shell>
+    );
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -113,66 +181,82 @@ export default function ApprovalsPage() {
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search programs, documents, users..."
               className="w-full rounded-xl border px-3 py-2 pl-10 text-sm"
             />
           </div>
-          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Module</option>
-            <option>Program</option>
-            <option>Committee</option>
-            <option>Estimation</option>
-            <option>Verification</option>
-            <option>Contract</option>
-            <option>Payment</option>
-            <option>Monitoring</option>
+          <select
+            value={selectedModule}
+            onChange={(e) => setSelectedModule(e.target.value)}
+            className="rounded-xl border bg-white px-3 py-2 text-sm"
+          >
+            <option value="">All Modules</option>
+            <option value="program">Program</option>
+            <option value="committee">Committee</option>
+            <option value="estimation">Estimation</option>
+            <option value="verification">Verification</option>
+            <option value="contract">Contract</option>
+            <option value="payment">Payment</option>
+            <option value="monitoring">Monitoring</option>
           </select>
-          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Status</option>
-            <option>Pending</option>
-            <option>Approved</option>
-            <option>Rejected</option>
-            <option>Re-uploaded</option>
-          </select>
-          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Ward</option>
+          <select
+            value={selectedWard}
+            onChange={(e) => setSelectedWard(e.target.value)}
+            className="rounded-xl border bg-white px-3 py-2 text-sm"
+          >
+            <option value="">All Wards</option>
             {Array.from({length: 20}).map((_,i) => (
-              <option key={i+1}>Ward {i+1}</option>
+              <option key={i+1} value={`ward-${i+1}`}>Ward {i+1}</option>
             ))}
           </select>
-          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Fiscal Year</option>
-            <option>2024/25</option>
-            <option>2025/26</option>
+          <select
+            value={selectedFiscalYear}
+            onChange={(e) => setSelectedFiscalYear(e.target.value)}
+            className="rounded-xl border bg-white px-3 py-2 text-sm"
+          >
+            <option value="">All Fiscal Years</option>
+            <option value="2024/25">2024/25</option>
+            <option value="2025/26">2025/26</option>
           </select>
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-400" />
-            <input type="date" className="rounded-xl border px-3 py-2 text-sm" />
-            <span className="text-sm text-gray-500">to</span>
-            <input type="date" className="rounded-xl border px-3 py-2 text-sm" />
-          </div>
         </div>
       </Card>
 
       {/* Tabs */}
       <Card>
         <div className="flex items-center border-b">
-          <button className="border-b-2 border-gray-900 px-4 py-3 text-sm font-medium">Pending (5)</button>
-          <button className="px-4 py-3 text-sm text-gray-500 hover:text-gray-700">Approved (12)</button>
-          <button className="px-4 py-3 text-sm text-gray-500 hover:text-gray-700">Rejected (3)</button>
-          <button className="px-4 py-3 text-sm text-gray-500 hover:text-gray-700">Re-uploaded (2)</button>
+          {[
+            { id: 'pending', label: 'Pending' },
+            { id: 'approved', label: 'Approved' },
+            { id: 'rejected', label: 'Rejected' },
+            { id: 're-upload-requested', label: 'Re-uploaded' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 text-sm font-medium ${
+                tab.id === activeTab
+                  ? 'border-b-2 border-gray-900 text-gray-900'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label} ({approvals.filter(a => a.status === tab.id).length})
+            </button>
+          ))}
         </div>
       </Card>
 
       {/* Approval Items */}
       <div className="space-y-4">
-        {DEMO_ITEMS.map((item) => (
+        {filteredApprovals.length > 0 ? filteredApprovals.map((item) => (
           <Card key={item.id}>
             <div className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="text-lg font-medium">{item.programName}</div>
+                    <span className="text-sm text-gray-500">({item.programCode})</span>
                     <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-xs ${getStatusColor(item.status)}`}>
                       {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                     </span>
@@ -234,36 +318,56 @@ export default function ApprovalsPage() {
                 </div>
               )}
 
-              <div className="flex items-center gap-2">
-                <motion.button 
-                  whileHover={{ y: -1 }} 
-                  whileTap={{ scale: 0.98 }} 
-                  className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm text-white"
-                >
-                  <Check className="h-4 w-4" /> Approve
-                </motion.button>
-                <motion.button 
-                  whileHover={{ y: -1 }} 
-                  whileTap={{ scale: 0.98 }} 
-                  className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm text-white"
-                >
-                  <X className="h-4 w-4" /> Reject
-                </motion.button>
-                <motion.button 
-                  whileHover={{ y: -1 }} 
-                  whileTap={{ scale: 0.98 }} 
-                  className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm"
-                >
-                  <Upload className="h-4 w-4" /> Request Re-upload
-                </motion.button>
-                <input 
-                  placeholder="Add remarks (optional)" 
-                  className="flex-1 rounded-xl border px-3 py-2 text-sm"
-                />
+              {item.status === 'pending' && (
+                <div className="flex items-center gap-2">
+                  <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleApprovalAction(item.id, 'approve')}
+                    className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm text-white"
+                  >
+                    <Check className="h-4 w-4" /> Approve
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleApprovalAction(item.id, 'reject')}
+                    className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm text-white"
+                  >
+                    <X className="h-4 w-4" /> Reject
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleApprovalAction(item.id, 'request_reupload')}
+                    className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm"
+                  >
+                    <Upload className="h-4 w-4" /> Request Re-upload
+                  </motion.button>
+                  <input
+                    placeholder="Add remarks (optional)"
+                    className="flex-1 rounded-xl border px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
+              {item.status !== 'pending' && item.approvedBy && (
+                <div className="text-sm text-gray-600">
+                  {item.status === 'approved' ? 'Approved' : item.status === 'rejected' ? 'Rejected' : 'Re-upload requested'} by {item.approvedBy}
+                  {item.approvedAt && ` on ${new Date(item.approvedAt).toLocaleDateString()}`}
+                </div>
+              )}
+            </div>
+          </Card>
+        )) : (
+          <Card>
+            <div className="text-center py-12">
+              <div className="text-gray-500 mb-2">No approvals found</div>
+              <div className="text-sm text-gray-400">
+                {searchQuery ? 'Try adjusting your search criteria' : 'No items require approval at this time'}
               </div>
             </div>
           </Card>
-        ))}
+        )}
       </div>
 
       {/* Pagination */}

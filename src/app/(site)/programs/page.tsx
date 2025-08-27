@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
 import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
-import { Filter, MoreHorizontal, Settings, Search, Grid3X3, List, ArrowUpDown, ExternalLink, Pencil, Printer, Loader2, Eye } from "lucide-react";
+import { Search, Grid3X3, List, ArrowUpDown, Pencil, Printer, Loader2, Eye } from "lucide-react";
 import Link from "next/link";
 import { HydrationSafe } from "@/components/ui/HydrationSafe";
 
@@ -54,16 +54,47 @@ export default function ProgramsPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    totalCount: 0,
+    hasNextPage: false,
+    hasPreviousPage: false
+  });
+
+  // Filter states
+  const [selectedWard, setSelectedWard] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [selectedFiscalYear, setSelectedFiscalYear] = useState("");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   // Fetch programs from API
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/programs');
+        const params = new URLSearchParams({
+          search: query,
+          wardId: selectedWard,
+          status: selectedStatus,
+          fiscalYearId: selectedFiscalYear,
+          sortBy: sortBy,
+          sortOrder: sortOrder,
+          page: page.toString(),
+          limit: perPage.toString()
+        });
+
+        // Remove empty params
+        Array.from(params.entries()).forEach(([key, value]) => {
+          if (!value) params.delete(key);
+        });
+
+        const response = await fetch(`/api/programs?${params}`);
         if (response.ok) {
           const data = await response.json();
           setPrograms(data.programs);
+          setPagination(data.pagination);
         } else {
           setError('Failed to fetch programs');
         }
@@ -76,7 +107,7 @@ export default function ProgramsPage() {
     };
 
     fetchPrograms();
-  }, []);
+  }, [query, selectedWard, selectedStatus, selectedFiscalYear, sortBy, sortOrder, page, perPage]);
 
   const filtered = useMemo(() =>
     programs.filter(p =>
