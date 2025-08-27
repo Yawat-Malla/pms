@@ -1,29 +1,47 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Shell from "@/components/layout/Shell";
 import { Card } from "@/components/ui/Card";
 import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
-import { TeamChat } from "@/components/widgets/TeamChat";
+import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { motion } from "framer-motion";
-import { Calendar, FileText, Upload, X, ChevronDown } from "lucide-react";
+import { Calendar, FileText, Upload, X, ChevronDown, Loader2 } from "lucide-react";
 import Link from "next/link";
 
+interface Ward {
+  id: string;
+  code: string;
+  name: string;
+}
+
 export default function CreateProgramPage() {
+  const router = useRouter();
   const today = new Date();
   const year = today.getFullYear();
-  const [programId] = useState<string>(() => `PRG-${year}-${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, "0")}`);
+  const [programId, setProgramId] = useState<string>("");
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [wards, setWards] = useState<Ward[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const fiscalYears = useMemo(() => [year - 1, year, year + 1], [year]);
 
+  // Generate program ID only on client side to prevent hydration mismatch
+  useEffect(() => {
+    const generatedId = `PRG-${year}-${String(Math.floor(Math.random() * 9000) + 1000).padStart(4, "0")}`;
+    setProgramId(generatedId);
+  }, [year]);
+
   const [form, setForm] = useState({
-    code: programId,
+    code: "",
     name: "",
     fiscalYear: String(year),
-    ward: "",
-    type: "new",
+    wardId: "",
+    type: "NEW" as "NEW" | "CARRIED_OVER" | "EXTENSION",
     budget: "",
-    funding: "Red Book",
+    funding: "RED_BOOK" as "RED_BOOK" | "EXECUTIVE" | "OTHER",
     description: "",
     startDate: "",
     endDate: "",
@@ -31,12 +49,40 @@ export default function CreateProgramPage() {
     tags: "",
   });
 
+  // Update form code when programId is generated
+  useEffect(() => {
+    if (programId) {
+      setForm(prev => ({ ...prev, code: programId }));
+    }
+  }, [programId]);
+
   type FileItem = { id: string; file: File };
   const [redBookFiles, setRedBookFiles] = useState<FileItem[]>([]);
   const [execFiles, setExecFiles] = useState<FileItem[]>([]);
 
+  // Fetch wards on component mount
+  useEffect(() => {
+    const fetchWards = async () => {
+      try {
+        const response = await fetch('/api/wards');
+        if (response.ok) {
+          const data = await response.json();
+          setWards(data.wards);
+        }
+      } catch (error) {
+        console.error('Error fetching wards:', error);
+      }
+    };
+    
+    fetchWards();
+  }, []);
+
   function handleChange<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    // Clear error when user starts typing
+    if (errors[key]) {
+      setErrors(prev => ({ ...prev, [key]: "" }));
+    }
   }
 
   function handleAddFiles(target: "red" | "exec", files: FileList | null) {
@@ -51,8 +97,77 @@ export default function CreateProgramPage() {
     if (target === "exec") setExecFiles((p) => p.filter((x) => x.id !== id));
   }
 
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!form.name.trim()) newErrors.name = "Program name is required";
+    if (!form.wardId) newErrors.wardId = "Ward is required";
+    if (form.budget && isNaN(parseFloat(form.budget))) newErrors.budget = "Invalid budget amount";
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (isDraft: boolean = false) => {
+    if (!validateForm()) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Parse tags
+      const tags = form.tags ? form.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
+      
+      const programData = {
+        code: form.code,
+        name: form.name.trim(),
+        fiscalYear: form.fiscalYear,
+        wardId: form.wardId,
+        budget: form.budget || undefined,
+        fundingSource: form.funding,
+        programType: form.type,
+        description: form.description.trim() || undefined,
+        startDate: form.startDate || undefined,
+        endDate: form.endDate || undefined,
+        tags,
+        responsibleOfficer: form.officer.trim() || undefined,
+      };
+
+      const response = await fetch('/api/programs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(programData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Program created:', result);
+        
+        // Redirect to programs list
+        router.push('/programs');
+      } else {
+        const errorData = await response.json();
+        console.error('Error creating program:', errorData);
+        
+        if (errorData.error === "Program code already exists") {
+          setErrors({ code: "Program code already exists" });
+        } else if (errorData.error === "Ward not found") {
+          setErrors({ wardId: "Selected ward not found" });
+        } else {
+          setErrors({ general: errorData.error || "Failed to create program" });
+        }
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setErrors({ general: "Network error. Please try again." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <Shell rightRail={<><RecentWork /><TimeManagement /><TeamChat /></>}>
+    <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
       <Card>
         <div className="flex items-center justify-between border-b p-4">
           <div>
@@ -62,10 +177,23 @@ export default function CreateProgramPage() {
           <div className="text-xs text-gray-500">Program Code</div>
         </div>
         <div className="flex items-center justify-between p-4">
-          <div className="text-sm"><span className="text-gray-500">Auto-generated:</span> <span className="font-medium">{form.code}</span></div>
+          <div className="text-sm">
+            <span className="text-gray-500">Auto-generated:</span> 
+            <span className="font-medium ml-1">
+              {programId ? programId : "Generating..."}
+            </span>
+          </div>
           <Link href="/programs" className="text-sm text-gray-600 hover:underline">Cancel / Back to List</Link>
         </div>
       </Card>
+
+      {errors.general && (
+        <Card>
+          <div className="p-4 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg">
+            {errors.general}
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_1fr]">
         {/* Left: Program Info */}
@@ -73,47 +201,97 @@ export default function CreateProgramPage() {
           <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
             <div className="md:col-span-2">
               <label className="text-xs text-gray-600">Program ID</label>
-              <input value={form.code} onChange={(e) => handleChange("code", e.target.value)} className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" />
+              <input 
+                value={form.code} 
+                onChange={(e) => handleChange("code", e.target.value)} 
+                className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${errors.code ? 'border-rose-300' : ''}`} 
+                placeholder={programId ? programId : "Generating program ID..."}
+                disabled={!programId}
+              />
+              {errors.code && <div className="text-xs text-rose-600 mt-1">{errors.code}</div>}
             </div>
             <div className="md:col-span-2">
-              <label className="text-xs text-gray-600">Program Name</label>
-              <input value={form.name} onChange={(e) => handleChange("name", e.target.value)} className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" placeholder="e.g., Road Maintenance - Ward 12" />
+              <label className="text-xs text-gray-600">Program Name *</label>
+              <input 
+                value={form.name} 
+                onChange={(e) => handleChange("name", e.target.value)} 
+                className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${errors.name ? 'border-rose-300' : ''}`} 
+                placeholder="e.g., Road Maintenance - Ward 12" 
+              />
+              {errors.name && <div className="text-xs text-rose-600 mt-1">{errors.name}</div>}
             </div>
             <div>
               <label className="text-xs text-gray-600">Fiscal Year</label>
               <div className="relative mt-1">
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <select value={form.fiscalYear} onChange={(e) => handleChange("fiscalYear", e.target.value)} className="w-full appearance-none rounded-xl border bg-white px-3 py-2 text-sm">
+                <select 
+                  value={form.fiscalYear} 
+                  onChange={(e) => handleChange("fiscalYear", e.target.value)} 
+                  className="w-full appearance-none rounded-xl border bg-white px-3 py-2 text-sm"
+                >
                   {fiscalYears.map((fy) => (<option key={fy} value={fy}>{fy}</option>))}
                 </select>
               </div>
             </div>
             <div>
-              <label className="text-xs text-gray-600">Ward</label>
-              <input value={form.ward} onChange={(e) => handleChange("ward", e.target.value)} className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" placeholder="e.g., 12 (comma separated for multi)" />
+              <label className="text-xs text-gray-600">Ward *</label>
+              <select 
+                value={form.wardId} 
+                onChange={(e) => handleChange("wardId", e.target.value)} 
+                className={`mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm ${errors.wardId ? 'border-rose-300' : ''}`}
+              >
+                <option value="">Select ward...</option>
+                {wards.map((ward) => (
+                  <option key={ward.id} value={ward.id}>
+                    Ward {ward.code} - {ward.name}
+                  </option>
+                ))}
+              </select>
+              {errors.wardId && <div className="text-xs text-rose-600 mt-1">{errors.wardId}</div>}
             </div>
             <div>
               <label className="text-xs text-gray-600">Program Type</label>
-              <select value={form.type} onChange={(e) => handleChange("type", e.target.value)} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm">
-                <option value="new">New Program</option>
-                <option value="carried">Carried-over</option>
+              <select 
+                value={form.type} 
+                onChange={(e) => handleChange("type", e.target.value as any)} 
+                className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"
+              >
+                <option value="NEW">New Program</option>
+                <option value="CARRIED_OVER">Carried-over</option>
+                <option value="EXTENSION">Extension</option>
               </select>
             </div>
             <div>
               <label className="text-xs text-gray-600">Budget Amount</label>
-              <input value={form.budget} onChange={(e) => handleChange("budget", e.target.value)} className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" placeholder="e.g., 1,000,000" />
+              <input 
+                value={form.budget} 
+                onChange={(e) => handleChange("budget", e.target.value)} 
+                className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm ${errors.budget ? 'border-rose-300' : ''}`} 
+                placeholder="e.g., 1000000" 
+              />
+              {errors.budget && <div className="text-xs text-rose-600 mt-1">{errors.budget}</div>}
             </div>
             <div>
               <label className="text-xs text-gray-600">Funding Source</label>
-              <select value={form.funding} onChange={(e) => handleChange("funding", e.target.value)} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm">
-                <option>Red Book</option>
-                <option>Executive</option>
-                <option>Other</option>
+              <select 
+                value={form.funding} 
+                onChange={(e) => handleChange("funding", e.target.value as any)} 
+                className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"
+              >
+                <option value="RED_BOOK">Red Book</option>
+                <option value="EXECUTIVE">Executive</option>
+                <option value="OTHER">Other</option>
               </select>
             </div>
             <div className="md:col-span-2">
               <label className="text-xs text-gray-600">Description</label>
-              <textarea value={form.description} onChange={(e) => handleChange("description", e.target.value)} className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" rows={4} placeholder="Brief summary and objectives" />
+              <textarea 
+                value={form.description} 
+                onChange={(e) => handleChange("description", e.target.value)} 
+                className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" 
+                rows={4} 
+                placeholder="Brief summary and objectives" 
+              />
             </div>
           </div>
         </Card>
@@ -161,27 +339,46 @@ export default function CreateProgramPage() {
             <div className="grid grid-cols-1 gap-4 p-4">
               <div>
                 <label className="text-xs text-gray-600">Category Tags</label>
-                <input value={form.tags} onChange={(e) => handleChange("tags", e.target.value)} className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" placeholder="e.g., road, maintenance" />
+                <input 
+                  value={form.tags} 
+                  onChange={(e) => handleChange("tags", e.target.value)} 
+                  className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" 
+                  placeholder="e.g., road, maintenance" 
+                />
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-xs text-gray-600">Start Date</label>
                   <div className="relative mt-1">
                     <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <input type="date" value={form.startDate} onChange={(e) => handleChange("startDate", e.target.value)} className="w-full rounded-xl border bg-white px-3 py-2 text-sm" />
+                    <input 
+                      type="date" 
+                      value={form.startDate} 
+                      onChange={(e) => handleChange("startDate", e.target.value)} 
+                      className="w-full rounded-xl border bg-white px-3 py-2 text-sm" 
+                    />
                   </div>
                 </div>
                 <div>
                   <label className="text-xs text-gray-600">End Date</label>
                   <div className="relative mt-1">
                     <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <input type="date" value={form.endDate} onChange={(e) => handleChange("endDate", e.target.value)} className="w-full rounded-xl border bg-white px-3 py-2 text-sm" />
+                    <input 
+                      type="date" 
+                      value={form.endDate} 
+                      onChange={(e) => handleChange("endDate", e.target.value)} 
+                      className="w-full rounded-xl border bg-white px-3 py-2 text-sm" 
+                    />
                   </div>
                 </div>
               </div>
               <div>
                 <label className="text-xs text-gray-600">Responsible Officer</label>
-                <select value={form.officer} onChange={(e) => handleChange("officer", e.target.value)} className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm">
+                <select 
+                  value={form.officer} 
+                  onChange={(e) => handleChange("officer", e.target.value)} 
+                  className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"
+                >
                   <option value="">Select officer...</option>
                   <option>Planning Officer</option>
                   <option>CAO</option>
@@ -189,8 +386,26 @@ export default function CreateProgramPage() {
                 </select>
               </div>
               <div className="flex flex-wrap items-center gap-2 pt-2">
-                <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className="rounded-xl border px-3 py-2 text-sm">Save Draft</motion.button>
-                <motion.button whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }} className="rounded-xl bg-gray-900 px-3 py-2 text-sm text-white">Submit for Approval</motion.button>
+                <motion.button 
+                  whileHover={{ y: -2 }} 
+                  whileTap={{ scale: 0.98 }} 
+                  onClick={() => handleSubmit(true)}
+                  disabled={isSubmitting}
+                  className="rounded-xl border px-3 py-2 text-sm disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
+                  Save Draft
+                </motion.button>
+                <motion.button 
+                  whileHover={{ y: -2 }} 
+                  whileTap={{ scale: 0.98 }} 
+                  onClick={() => handleSubmit(false)}
+                  disabled={isSubmitting}
+                  className="rounded-xl bg-gray-900 px-3 py-2 text-sm text-white disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
+                  Submit for Approval
+                </motion.button>
                 <Link href="/programs" className="text-sm text-gray-600 hover:underline">Cancel / Back to List</Link>
               </div>
             </div>

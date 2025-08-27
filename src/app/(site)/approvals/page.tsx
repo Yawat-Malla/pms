@@ -1,277 +1,280 @@
 "use client";
-import { useState } from "react";
 import Shell from "@/components/layout/Shell";
 import { Card } from "@/components/ui/Card";
 import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
-import { TeamChat } from "@/components/widgets/TeamChat";
+import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { motion } from "framer-motion";
-import { Check, X, Upload, MessageSquare, Filter, Download, Eye, History, Calendar, FileText, ChevronDown } from "lucide-react";
-import Link from "next/link";
-
-const DEMO_ITEMS = Array.from({ length: 15 }).map((_, i) => ({
-  id: `PRG-${1000 + i}`,
-  name: ["Road Maintenance", "Water Supply Upgrade", "School Renovation", "Health Post Expansion", "Street Lighting"][i % 5] + ` ${i+1}`,
-  ward: 1 + (i % 12),
-  submittedBy: ["Ward Secretary", "Planning Officer", "Technical Head"][i % 3],
-  submittedAt: "2025-01-12",
-  documentType: ["Committee Minutes", "Cost Estimation", "Verification Report", "Contract Document", "Payment Request"][i % 5],
-  status: ["Pending", "Approved", "Rejected", "Re-uploaded"][i % 4] as "Pending" | "Approved" | "Rejected" | "Re-uploaded",
-  remarks: i % 3 === 0 ? "Please provide additional details" : "",
-  hasFiles: i % 2 === 0,
-}));
+import { Filter, Search, Clock, CheckCircle2, XCircle, Upload, Eye, Check, X, Download, MoreHorizontal, Calendar, Building2, FileText, User, ArrowRight } from "lucide-react";
+import { HydrationSafe } from "@/components/ui/HydrationSafe";
 
 export default function ApprovalsPage() {
-  const [activeTab, setActiveTab] = useState<"pending" | "approved" | "rejected">("pending");
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [filters, setFilters] = useState({
-    module: "",
-    status: "",
-    ward: "",
-    fiscalYear: "",
-    dateFrom: "",
-    dateTo: "",
-  });
-
-  const filteredItems = DEMO_ITEMS.filter(item => {
-    if (activeTab === "pending" && item.status !== "Pending") return false;
-    if (activeTab === "approved" && item.status !== "Approved") return false;
-    if (activeTab === "rejected" && !["Rejected", "Re-uploaded"].includes(item.status)) return false;
-    
-    if (filters.module && !item.documentType.toLowerCase().includes(filters.module.toLowerCase())) return false;
-    if (filters.ward && item.ward !== Number(filters.ward)) return false;
-    if (filters.status && item.status !== filters.status) return false;
-    
-    return true;
-  });
+  const DEMO_ITEMS = [
+    {
+      id: "PRG-001",
+      programName: "Road Maintenance - Ward 12",
+      ward: "Ward 12",
+      submittedBy: "Ward Secretary",
+      submittedDate: "2025-01-15",
+      documentType: "Committee Minutes",
+      attachedFiles: ["minutes_2025_01_15.pdf", "photos.zip"],
+      remarks: "",
+      status: "pending",
+      priority: "high"
+    },
+    {
+      id: "PRG-002",
+      programName: "Water Supply Upgrade",
+      ward: "Ward 5",
+      submittedBy: "Technical Head",
+      submittedDate: "2025-01-14",
+      documentType: "Cost Estimation",
+      attachedFiles: ["estimation_detailed.pdf", "technical_drawings.pdf"],
+      remarks: "",
+      status: "pending",
+      priority: "medium"
+    },
+    {
+      id: "PRG-003",
+      programName: "School Renovation Project",
+      ward: "Ward 8",
+      submittedBy: "Planning Officer",
+      submittedDate: "2025-01-13",
+      documentType: "Contract Review",
+      attachedFiles: ["contract_draft.pdf", "vendor_quotes.pdf"],
+      remarks: "",
+      status: "pending",
+      priority: "high"
+    },
+    {
+      id: "PRG-004",
+      programName: "Health Post Expansion",
+      ward: "Ward 2",
+      submittedBy: "Ward Secretary",
+      submittedDate: "2025-01-12",
+      documentType: "Verification Report",
+      attachedFiles: ["verification_report.pdf", "site_photos.pdf"],
+      remarks: "",
+      status: "pending",
+      priority: "low"
+    },
+    {
+      id: "PRG-005",
+      programName: "Street Lighting Installation",
+      ward: "Ward 9",
+      submittedBy: "Technical Head",
+      submittedDate: "2025-01-11",
+      documentType: "Progress Review",
+      attachedFiles: ["progress_report.pdf", "quality_check.pdf"],
+      remarks: "",
+      status: "pending",
+      priority: "medium"
+    }
+  ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Approved': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'Rejected': return 'bg-rose-50 text-rose-700 border-rose-200';
-      case 'Re-uploaded': return 'bg-amber-50 text-amber-700 border-amber-200';
-      default: return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'pending': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'approved': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'rejected': return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 're-uploaded': return 'bg-blue-50 text-blue-700 border-blue-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
-  const handleBulkAction = (action: string) => {
-    if (selectedItems.length === 0) return;
-    console.log(`${action} items:`, selectedItems);
-    setSelectedItems([]);
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'text-rose-600 bg-rose-50 border-rose-200';
+      case 'medium': return 'text-amber-600 bg-amber-50 border-amber-200';
+      case 'low': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
   };
 
   return (
-    <Shell rightRail={<><RecentWork /><TimeManagement /><TeamChat /></>}>
+    <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
+      {/* Header */}
       <Card>
-        <div className="flex items-center justify-between border-b p-4">
-          <div className="text-lg font-semibold">Pending Approvals</div>
-          <div className="text-xs text-gray-500">{filteredItems.length} items</div>
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div>
+            <div className="text-lg font-semibold">Pending Approvals</div>
+            <div className="text-xs text-gray-500">Review and approve pending requests from various modules</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="rounded-xl border px-3 py-2 text-sm">Bulk Actions</button>
+            <button className="rounded-xl bg-gray-900 px-3 py-2 text-sm text-white">Export</button>
+          </div>
         </div>
-        
-        {/* Filters */}
-        <div className="grid grid-cols-1 gap-4 border-b p-4 md:grid-cols-2 lg:grid-cols-6">
-          <div>
-            <div className="text-xs text-gray-500">Module</div>
-            <select 
-              value={filters.module} 
-              onChange={(e) => setFilters(prev => ({ ...prev, module: e.target.value }))}
-              className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"
-            >
-              <option value="">All Modules</option>
-              <option>Program</option>
-              <option>Committee</option>
-              <option>Estimation</option>
-              <option>Verification</option>
-              <option>Contract</option>
-              <option>Payment</option>
-              <option>Monitoring</option>
-            </select>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500">Status</div>
-            <select 
-              value={filters.status} 
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"
-            >
-              <option value="">All Status</option>
-              <option>Pending</option>
-              <option>Approved</option>
-              <option>Rejected</option>
-              <option>Re-uploaded</option>
-            </select>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500">Ward</div>
-            <select 
-              value={filters.ward} 
-              onChange={(e) => setFilters(prev => ({ ...prev, ward: e.target.value }))}
-              className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"
-            >
-              <option value="">All Wards</option>
-              {Array.from({length: 20}).map((_,i) => (
-                <option key={i+1} value={i+1}>Ward {i+1}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500">Fiscal Year</div>
-            <select 
-              value={filters.fiscalYear} 
-              onChange={(e) => setFilters(prev => ({ ...prev, fiscalYear: e.target.value }))}
-              className="mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm"
-            >
-              <option value="">All Years</option>
-              <option>2024/25</option>
-              <option>2025/26</option>
-            </select>
-          </div>
-          <div>
-            <div className="text-xs text-gray-500">Date From</div>
-            <input 
-              type="date" 
-              value={filters.dateFrom} 
-              onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-              className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" 
+      </Card>
+
+      {/* Filters */}
+      <Card>
+        <div className="flex flex-wrap items-center gap-3 p-4">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              placeholder="Search programs, documents, users..."
+              className="w-full rounded-xl border px-3 py-2 pl-10 text-sm"
             />
           </div>
-          <div>
-            <div className="text-xs text-gray-500">Date To</div>
-            <input 
-              type="date" 
-              value={filters.dateTo} 
-              onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-              className="mt-1 w-full rounded-xl border px-3 py-2 text-sm" 
-            />
+          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
+            <option>Module</option>
+            <option>Program</option>
+            <option>Committee</option>
+            <option>Estimation</option>
+            <option>Verification</option>
+            <option>Contract</option>
+            <option>Payment</option>
+            <option>Monitoring</option>
+          </select>
+          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
+            <option>Status</option>
+            <option>Pending</option>
+            <option>Approved</option>
+            <option>Rejected</option>
+            <option>Re-uploaded</option>
+          </select>
+          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
+            <option>Ward</option>
+            {Array.from({length: 20}).map((_,i) => (
+              <option key={i+1}>Ward {i+1}</option>
+            ))}
+          </select>
+          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
+            <option>Fiscal Year</option>
+            <option>2024/25</option>
+            <option>2025/26</option>
+          </select>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-400" />
+            <input type="date" className="rounded-xl border px-3 py-2 text-sm" />
+            <span className="text-sm text-gray-500">to</span>
+            <input type="date" className="rounded-xl border px-3 py-2 text-sm" />
           </div>
         </div>
+      </Card>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-2 border-b px-4 py-2 text-sm">
-          {[
-            { id: "pending", label: "Pending", count: DEMO_ITEMS.filter(i => i.status === "Pending").length },
-            { id: "approved", label: "Approved", count: DEMO_ITEMS.filter(i => i.status === "Approved").length },
-            { id: "rejected", label: "Rejected/Re-uploaded", count: DEMO_ITEMS.filter(i => ["Rejected", "Re-uploaded"].includes(i.status)).length },
-          ].map((tab) => (
-            <button 
-              key={tab.id} 
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 rounded-xl px-3 py-1.5 ${activeTab === tab.id ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"}`}
-            >
-              {tab.label} <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-700">{tab.count}</span>
-            </button>
-          ))}
+      {/* Tabs */}
+      <Card>
+        <div className="flex items-center border-b">
+          <button className="border-b-2 border-gray-900 px-4 py-3 text-sm font-medium">Pending (5)</button>
+          <button className="px-4 py-3 text-sm text-gray-500 hover:text-gray-700">Approved (12)</button>
+          <button className="px-4 py-3 text-sm text-gray-500 hover:text-gray-700">Rejected (3)</button>
+          <button className="px-4 py-3 text-sm text-gray-500 hover:text-gray-700">Re-uploaded (2)</button>
         </div>
+      </Card>
 
-        {/* Bulk Actions */}
-        {selectedItems.length > 0 && (
-          <div className="flex items-center gap-2 border-b p-4">
-            <div className="text-sm text-gray-600">{selectedItems.length} items selected</div>
-            <div className="ml-auto flex items-center gap-2">
-              <motion.button 
-                whileHover={{ y: -1 }} 
-                whileTap={{ scale: 0.98 }} 
-                onClick={() => handleBulkAction("approve")}
-                className="rounded-xl bg-emerald-600 px-3 py-2 text-sm text-white"
-              >
-                <Check className="mr-1 inline h-4 w-4" /> Approve All
-              </motion.button>
-              <motion.button 
-                whileHover={{ y: -1 }} 
-                whileTap={{ scale: 0.98 }} 
-                onClick={() => handleBulkAction("reject")}
-                className="rounded-xl bg-rose-600 px-3 py-2 text-sm text-white"
-              >
-                <X className="mr-1 inline h-4 w-4" /> Reject All
-              </motion.button>
+      {/* Approval Items */}
+      <div className="space-y-4">
+        {DEMO_ITEMS.map((item) => (
+          <Card key={item.id}>
+            <div className="p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="text-lg font-medium">{item.programName}</div>
+                    <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-xs ${getStatusColor(item.status)}`}>
+                      {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                    </span>
+                    <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-xs ${getPriorityColor(item.priority)}`}>
+                      {item.priority} priority
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 text-sm text-gray-600 md:grid-cols-3">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      <span>{item.ward}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      <span>{item.submittedBy}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>
+                        <HydrationSafe>
+                          {new Date(item.submittedDate).toLocaleDateString()}
+                        </HydrationSafe>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button className="p-2 hover:bg-gray-100 rounded-lg">
+                    <Eye className="h-4 w-4 text-gray-600" />
+                  </button>
+                  <button className="p-2 hover:bg-gray-100 rounded-lg">
+                    <Download className="h-4 w-4 text-gray-600" />
+                  </button>
+                  <button className="p-2 hover:bg-gray-100 rounded-lg">
+                    <MoreHorizontal className="h-4 w-4 text-gray-600" />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium">{item.documentType}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {item.attachedFiles.map((file, index) => (
+                    <span key={index} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs bg-gray-50">
+                      <FileText className="h-3 w-3" />
+                      {file}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {item.remarks && (
+                <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="text-sm font-medium text-amber-800 mb-1">Previous Remarks:</div>
+                  <div className="text-sm text-amber-700">{item.remarks}</div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <motion.button 
+                  whileHover={{ y: -1 }} 
+                  whileTap={{ scale: 0.98 }} 
+                  className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm text-white"
+                >
+                  <Check className="h-4 w-4" /> Approve
+                </motion.button>
+                <motion.button 
+                  whileHover={{ y: -1 }} 
+                  whileTap={{ scale: 0.98 }} 
+                  className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm text-white"
+                >
+                  <X className="h-4 w-4" /> Reject
+                </motion.button>
+                <motion.button 
+                  whileHover={{ y: -1 }} 
+                  whileTap={{ scale: 0.98 }} 
+                  className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm"
+                >
+                  <Upload className="h-4 w-4" /> Request Re-upload
+                </motion.button>
+                <input 
+                  placeholder="Add remarks (optional)" 
+                  className="flex-1 rounded-xl border px-3 py-2 text-sm"
+                />
+              </div>
             </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      <Card>
+        <div className="flex items-center justify-between p-4">
+          <div className="text-sm text-gray-500">Showing 1–5 of 5 items</div>
+          <div className="flex items-center gap-2">
+            <button className="rounded-lg border px-3 py-1 text-sm disabled:opacity-50" disabled>Previous</button>
+            <span className="px-3 py-1 text-sm text-gray-500">Page 1 of 1</span>
+            <button className="rounded-lg border px-3 py-1 text-sm disabled:opacity-50" disabled>Next</button>
           </div>
-        )}
-
-        {/* Items List */}
-        <div className="divide-y">
-          {filteredItems.map((item) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25 }}
-              className="flex flex-wrap items-start gap-3 p-4"
-            >
-              {/* Checkbox for bulk selection */}
-              <input 
-                type="checkbox" 
-                checked={selectedItems.includes(item.id)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setSelectedItems(prev => [...prev, item.id]);
-                  } else {
-                    setSelectedItems(prev => prev.filter(id => id !== item.id));
-                  }
-                }}
-                className="mt-1 h-4 w-4"
-              />
-
-              {/* Item Details */}
-              <div className="flex-1 min-w-64">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <Link href={`/programs/${encodeURIComponent(item.id)}`} className="text-sm font-medium hover:underline">
-                      {item.name}
-                    </Link>
-                    <div className="text-xs text-gray-500">{item.id} · Ward {item.ward}</div>
-                  </div>
-                  <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-xs ${getStatusColor(item.status)}`}>
-                    {item.status}
-                  </span>
-                </div>
-                <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-gray-600 md:grid-cols-3">
-                  <div>Submitted by: {item.submittedBy}</div>
-                  <div>Document: {item.documentType}</div>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" /> {item.submittedAt}
-                  </div>
-                </div>
-                {item.remarks && (
-                  <div className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
-                    <strong>Remarks:</strong> {item.remarks}
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-wrap items-center gap-2">
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} className="rounded-xl border px-3 py-1.5 text-sm">
-                  <History className="mr-1 inline h-4 w-4" /> History
-                </motion.button>
-                {item.hasFiles && (
-                  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} className="rounded-xl border px-3 py-1.5 text-sm">
-                    <Download className="mr-1 inline h-4 w-4" /> Files
-                  </motion.button>
-                )}
-                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} className="rounded-xl border px-3 py-1.5 text-sm">
-                  <Eye className="mr-1 inline h-4 w-4" /> View
-                </motion.button>
-                
-                {item.status === "Pending" && (
-                  <>
-                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} className="rounded-xl border px-3 py-1.5 text-sm">
-                      <MessageSquare className="mr-1 inline h-4 w-4" /> Remarks
-                    </motion.button>
-                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} className="rounded-xl border px-3 py-1.5 text-sm">
-                      <Upload className="mr-1 inline h-4 w-4" /> Re-upload
-                    </motion.button>
-                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} className="rounded-xl bg-emerald-600 px-3 py-1.5 text-sm text-white">
-                      <Check className="mr-1 inline h-4 w-4" /> Approve
-                    </motion.button>
-                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }} className="rounded-xl bg-rose-600 px-3 py-1.5 text-sm text-white">
-                      <X className="mr-1 inline h-4 w-4" /> Reject
-                    </motion.button>
-                  </>
-                )}
-              </div>
-            </motion.div>
-          ))}
         </div>
       </Card>
     </Shell>

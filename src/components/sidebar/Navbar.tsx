@@ -7,25 +7,30 @@ import {
   Users, 
   BarChart3, 
   Settings, 
+  LogOut,
+  FolderOpen,
 } from "lucide-react";
+
+// Custom Programs icon component
+const ProgramsIcon = () => (
+  <div className="w-5 h-5 bg-gradient-to-br from-purple-500 to-orange-500 rounded-md flex items-center justify-center">
+    <div className="w-2.5 h-2.5 bg-white rounded-sm opacity-80"></div>
+  </div>
+);
 
 export default function Navbar() {
   const pathname = usePathname();
 
   const navItems = useMemo(() => ([
     { id: "dashboard", icon: Home, label: "Dashboard", href: "/dashboard" },
-    { id: "programs", icon: () => (
-      <div className="w-5 h-5 bg-gradient-to-br from-purple-500 to-orange-500 rounded-md flex items-center justify-center">
-        <div className="w-2.5 h-2.5 bg-white rounded-sm opacity-80"></div>
-      </div>
-    ), label: "Programs", href: "/programs" },
+    { id: "programs", icon: ProgramsIcon, label: "Programs", href: "/programs" },
     { id: "approvals", icon: Users, label: "Approvals", href: "/approvals" },
     { id: "reports", icon: BarChart3, label: "Reports", href: "/reports" },
   ]), []);
 
   const bottomItems = useMemo(() => ([
     { id: "settings", icon: Settings, label: "Settings", href: "/settings" },
-    { id: "logout", icon: Settings, label: "Sign out", href: "/sign-in" },
+    { id: "logout", icon: LogOut, label: "Sign out", href: "/sign-in" },
   ]), []);
 
   return (

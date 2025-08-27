@@ -21,6 +21,18 @@ enum ProgramStatus {
   ARCHIVED
 }
 
+enum ProgramType {
+  NEW
+  CARRIED_OVER
+  EXTENSION
+}
+
+enum FundingSource {
+  RED_BOOK
+  EXECUTIVE
+  OTHER
+}
+
 model Ward {
   id       String    @id @default(cuid())
   code     String    @unique
@@ -28,12 +40,16 @@ model Ward {
   users    User[]
   programs Program[]
   createdAt DateTime @default(now())
+
+  @@index([code])
 }
 
 model Role {
   id    String @id @default(cuid())
   name  String @unique
-  users User[]            // <-- keep implicit M:N here (no @relation)
+  users User[]
+
+  @@index([name])
 }
 
 model User {
@@ -43,13 +59,20 @@ model User {
   hashedPassword String?
   ward           Ward?    @relation(fields: [wardId], references: [id])
   wardId         String?
-  roles          Role[]   // <-- remove @relation(...) here
+  roles          Role[]
   programsCreated Program[] @relation("ProgramCreatedBy")
+  documentsUploaded ProgramDocument[] @relation("DocumentUploadedBy")
+  paymentsRequested ProgramPayment[] @relation("PaymentRequestedBy")
+  paymentsApproved ProgramPayment[] @relation("PaymentApprovedBy")
+  approvalsGiven ProgramApproval[] @relation("ApprovalGivenBy")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   accounts Account[]
   sessions Session[]
+
+  @@index([email])
+  @@index([wardId])
 }
 
 model Program {
@@ -59,13 +82,106 @@ model Program {
   fiscalYear    String
   sector        String?
   budget        Decimal?       @db.Decimal(14,2)
+  fundingSource FundingSource  @default(RED_BOOK)
+  programType   ProgramType    @default(NEW)
+  description   String?
+  startDate     DateTime?
+  endDate       DateTime?
   status        ProgramStatus  @default(DRAFT)
   ward          Ward           @relation(fields: [wardId], references: [id])
   wardId        String
   createdBy     User?          @relation("ProgramCreatedBy", fields: [createdById], references: [id])
   createdById   String?
+  tags          String[]       @default([])
+  responsibleOfficer String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  // Relations
+  documents    ProgramDocument[]
+  approvals    ProgramApproval[]
+  payments     ProgramPayment[]
+  monitoring   ProgramMonitoring[]
+
+  @@index([code])
+  @@index([wardId])
+  @@index([status])
+  @@index([fiscalYear])
+  @@index([createdById])
+}
+
+model ProgramDocument {
+  id        String   @id @default(cuid())
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId String
+  fileName  String
+  filePath  String
+  fileType  String
+  fileSize  Int
+  category  String  // e.g., "red_book", "executive_approval", "estimation", "monitoring"
+  uploadedBy User   @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  uploadedById String
+  createdAt DateTime @default(now())
+
+  @@index([programId])
+  @@index([category])
+  @@index([uploadedById])
+}
+
+model ProgramApproval {
+  id          String   @id @default(cuid())
+  program     Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId   String
+  step        String   // e.g., "ward_secretary", "planning_officer", "cao"
+  status      String   // "pending", "approved", "rejected"
+  remarks     String?
+  approvedBy  User?    @relation("ApprovalGivenBy", fields: [approvedById], references: [id])
+  approvedById String?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([programId])
+  @@index([step])
+  @@index([status])
+  @@index([approvedById])
+}
+
+model ProgramPayment {
+  id          String   @id @default(cuid())
+  program     Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId   String
+  amount      Decimal  @db.Decimal(14,2)
+  purpose     String
+  status      String   // "pending", "approved", "rejected"
+  requestedBy User     @relation("PaymentRequestedBy", fields: [requestedById], references: [id])
+  requestedById String
+  approvedBy  User?    @relation("PaymentApprovedBy", fields: [approvedById], references: [id])
+  approvedById String?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([programId])
+  @@index([status])
+  @@index([requestedById])
+  @@index([approvedById])
+}
+
+model ProgramMonitoring {
+  id          String   @id @default(cuid())
+  program     Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId   String
+  type        String   // e.g., "site_inspection", "progress_review", "quality_check"
+  inspector   String
+  status      String   // "scheduled", "completed", "cancelled"
+  comments    String?
+  photos      String[] @default([])
+  reportDate  DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([programId])
+  @@index([type])
+  @@index([status])
+  @@index([reportDate])
 }
 
 //// NextAuth models ////
@@ -86,6 +202,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -95,6 +212,8 @@ model Session {
   expires      DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model VerificationToken {

@@ -3,13 +3,14 @@ import Shell from "@/components/layout/Shell";
 import { Card } from "@/components/ui/Card";
 import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
-import { TeamChat } from "@/components/widgets/TeamChat";
+import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { motion } from "framer-motion";
-import { UserPlus, Users, ShieldCheck, Lock, GitCompare, FileCog, Wrench, Globe, Image as ImageIcon, Plus, Trash2, Edit3, ChevronDown } from "lucide-react";
+import { UserPlus, Users, ShieldCheck, Lock, GitCompare, FileCog, Wrench, Globe, Image as ImageIcon, Plus, Trash2, Edit3, ChevronDown, Calendar, Building2, Tag, DollarSign } from "lucide-react";
+import { HydrationSafe } from "@/components/ui/HydrationSafe";
 
 export default function SettingsPage() {
   return (
-    <Shell rightRail={<><RecentWork /><TimeManagement /><TeamChat /></>}>
+    <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {/* 1. User & Role Management */}
         <Card>
@@ -165,7 +166,122 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {/* 6. Miscellaneous */}
+        {/* 6. Dynamic Configuration Management */}
+        <Card>
+          <div className="flex items-center justify-between border-b p-4">
+            <div className="flex items-center gap-2 text-sm font-medium"><Tag className="h-4 w-4" /> Dynamic Configuration</div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 p-4 text-sm">
+            
+            {/* Fiscal Years */}
+            <div className="rounded-xl border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-gray-600" />
+                  <span className="font-medium">Fiscal Years</span>
+                </div>
+                <motion.button whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs">
+                  <Plus className="h-3 w-3" /> Add
+                </motion.button>
+              </div>
+              <div className="space-y-2">
+                {["2023/24", "2024/25", "2025/26"].map((fy) => (
+                  <div key={fy} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                    <span className="text-sm">{fy}</span>
+                    <div className="flex items-center gap-1">
+                      <button className="p-1 hover:bg-gray-100 rounded"><Edit3 className="h-3 w-3" /></button>
+                      <button className="p-1 hover:bg-gray-100 rounded text-rose-600"><Trash2 className="h-3 w-3" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Wards */}
+            <div className="rounded-xl border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-gray-600" />
+                  <span className="font-medium">Wards</span>
+                </div>
+                <motion.button whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs">
+                  <Plus className="h-3 w-3" /> Add
+                </motion.button>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { code: "01", name: "Central Ward" },
+                  { code: "02", name: "North Ward" },
+                  { code: "03", name: "South Ward" },
+                  { code: "04", name: "East Ward" },
+                  { code: "05", name: "West Ward" }
+                ].map((ward) => (
+                  <div key={ward.code} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                    <div>
+                      <span className="text-sm font-medium">Ward {ward.code}</span>
+                      <span className="text-xs text-gray-500 ml-2">- {ward.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button className="p-1 hover:bg-gray-100 rounded"><Edit3 className="h-3 w-3" /></button>
+                      <button className="p-1 hover:bg-gray-100 rounded text-rose-600"><Trash2 className="h-3 w-3" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Program Types */}
+            <div className="rounded-xl border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4 text-gray-600" />
+                  <span className="font-medium">Program Types</span>
+                </div>
+                <motion.button whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs">
+                  <Plus className="h-3 w-3" /> Add
+                </motion.button>
+              </div>
+              <div className="space-y-2">
+                {["New Program", "Carried-over", "Extension", "Maintenance", "Emergency"].map((type) => (
+                  <div key={type} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                    <span className="text-sm">{type}</span>
+                    <div className="flex items-center gap-1">
+                      <button className="p-1 hover:bg-gray-100 rounded"><Edit3 className="h-3 w-3" /></button>
+                      <button className="p-1 hover:bg-gray-100 rounded text-rose-600"><Trash2 className="h-3 w-3" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Funding Sources */}
+            <div className="rounded-xl border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-gray-600" />
+                  <span className="font-medium">Funding Sources</span>
+                </div>
+                <motion.button whileHover={{ y: -1 }} whileTap={{ scale: 0.98 }} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs">
+                  <Plus className="h-3 w-3" /> Add
+                </motion.button>
+              </div>
+              <div className="space-y-2">
+                {["Red Book", "Executive Decision", "External Donor", "Municipal Fund", "Special Grant"].map((source) => (
+                  <div key={source} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                    <span className="text-sm">{source}</span>
+                    <div className="flex items-center gap-1">
+                      <button className="p-1 hover:bg-gray-100 rounded"><Edit3 className="h-3 w-3" /></button>
+                      <button className="p-1 hover:bg-gray-100 rounded text-rose-600"><Trash2 className="h-3 w-3" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </Card>
+
+        {/* 7. Miscellaneous */}
         <Card>
           <div className="flex items-center justify-between border-b p-4">
             <div className="flex items-center gap-2 text-sm font-medium"><Globe className="h-4 w-4" /> Miscellaneous</div>

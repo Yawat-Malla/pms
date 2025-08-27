@@ -3,10 +3,11 @@ import { Card } from "@/components/ui/Card";
 import Shell from "@/components/layout/Shell";
 import { RecentWork } from "@/components/widgets/RecentWork";
 import { TimeManagement } from "@/components/widgets/TimeManagement";
-import { TeamChat } from "@/components/widgets/TeamChat";
+import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { Plus, Upload, CheckCircle2, Clock, ListChecks, Files, DollarSign, TrendingUp, AlertTriangle, Calendar, Eye, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { HydrationSafe } from "@/components/ui/HydrationSafe";
 
 export default function DashboardPage() {
   const stats = [
@@ -52,11 +53,11 @@ export default function DashboardPage() {
   ];
 
   const pendingApprovals = [
-    { id: "PRG-001", name: "Road Maintenance", ward: 5, type: "Program Approval", priority: "high" },
-    { id: "PRG-002", name: "Water Supply", ward: 3, type: "Contract Review", priority: "medium" },
-    { id: "PRG-003", name: "School Building", ward: 7, type: "Payment Request", priority: "high" },
-    { id: "PRG-004", name: "Health Post", ward: 2, type: "Verification", priority: "low" },
-    { id: "PRG-005", name: "Street Lighting", ward: 9, type: "Committee Minutes", priority: "medium" },
+    { id: "PRG-001", name: "Road Maintenance", ward: 5, type: "Program Approval", priority: "high", link: "/programs/PRG-001" },
+    { id: "PRG-002", name: "Water Supply", ward: 3, type: "Contract Review", priority: "medium", link: "/programs/PRG-002" },
+    { id: "PRG-003", name: "School Building", ward: 7, type: "Payment Request", priority: "high", link: "/programs/PRG-003" },
+    { id: "PRG-004", name: "Health Post", ward: 2, type: "Verification", priority: "low", link: "/programs/PRG-004" },
+    { id: "PRG-005", name: "Street Lighting", ward: 9, type: "Committee Minutes", priority: "medium", link: "/programs/PRG-005" },
   ];
 
   const recentActivity = [
@@ -101,8 +102,17 @@ export default function DashboardPage() {
     }
   };
 
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'text-rose-600 bg-rose-50 border-rose-200';
+      case 'medium': return 'text-amber-600 bg-amber-50 border-amber-200';
+      case 'low': return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
+
   return (
-    <Shell rightRail={<><RecentWork /><TimeManagement /><TeamChat /></>}>
+    <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
       {/* 1. Header / Quick Stats */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => (
@@ -133,183 +143,124 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Ward-level Stats for CAO/Planning Officer */}
+      {/* 2. Ward Overview */}
       <Card>
         <div className="flex items-center justify-between border-b p-4">
-          <div className="text-sm font-medium">Ward-wise Overview</div>
-          <Link href="/reports" className="text-xs text-gray-600 hover:underline">View All</Link>
+          <div className="text-lg font-semibold">Ward Overview</div>
+          <Link href="/programs" className="text-sm text-blue-600 hover:underline">View All</Link>
         </div>
-        <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-4">
           {wardStats.map((ward) => (
-            <div key={ward.ward} className="rounded-lg border p-3 text-sm">
-              <div className="font-medium text-gray-900">{ward.ward}</div>
-              <div className="text-xs text-gray-500 mt-1">{ward.programs} programs</div>
-              <div className="text-xs text-gray-500">Budget: {ward.budget}</div>
-              <div className="text-xs text-gray-500">Spent: {ward.spent}</div>
+            <div key={ward.ward} className="rounded-lg border p-3">
+              <div className="text-sm font-medium mb-2">{ward.ward}</div>
+              <div className="space-y-1 text-xs text-gray-600">
+                <div>Programs: {ward.programs}</div>
+                <div>Budget: {ward.budget}</div>
+                <div>Spent: {ward.spent}</div>
+              </div>
             </div>
           ))}
         </div>
       </Card>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* 2. Charts Section */}
-        <Card>
-          <div className="flex items-center justify-between border-b p-4">
-            <div className="text-sm font-medium">Budget Utilization</div>
-            <select className="text-xs border rounded-lg px-2 py-1">
-              <option>By Ward</option>
-              <option>By Program</option>
-            </select>
-          </div>
-          <div className="p-4">
-            <div className="h-48 rounded-lg border bg-gray-50 flex items-center justify-center text-sm text-gray-500">
-              📊 Budget vs Expenses Chart
-              <br />
-              <span className="text-xs">(Chart component would go here)</span>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="flex items-center justify-between border-b p-4">
-            <div className="text-sm font-medium">Program Status Breakdown</div>
-          </div>
-          <div className="p-4">
-            <div className="h-48 rounded-lg border bg-gray-50 flex items-center justify-center text-sm text-gray-500">
-              🥧 Status Distribution Pie Chart
-              <br />
-              <span className="text-xs">(Chart component would go here)</span>
-            </div>
-          </div>
-        </Card>
-      </div>
 
       {/* 3. Task/Approval Queue */}
       <Card>
         <div className="flex items-center justify-between border-b p-4">
-          <div className="text-sm font-medium">Your Pending Approvals</div>
-          <Link href="/approvals" className="text-xs text-gray-600 hover:underline flex items-center gap-1">
-            View All <ArrowRight className="h-3 w-3" />
-          </Link>
+          <div className="text-lg font-semibold">Your Pending Approvals</div>
+          <Link href="/approvals" className="text-sm text-blue-600 hover:underline">View All</Link>
         </div>
-        <div className="divide-y">
-          {pendingApprovals.map((item) => (
-            <div key={item.id} className="flex items-center justify-between p-4">
-              <div className="flex-1">
-                <div className="text-sm font-medium">{item.name}</div>
-                <div className="text-xs text-gray-500">{item.id} · Ward {item.ward} · {item.type}</div>
+        <div className="p-4">
+          <div className="space-y-3">
+            {pendingApprovals.slice(0, 5).map((item) => (
+              <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-amber-400"></div>
+                  <div>
+                    <div className="font-medium text-sm">{item.name}</div>
+                    <div className="text-xs text-gray-500">Ward {item.ward} • {item.type}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-xs ${getPriorityColor(item.priority)}`}>
+                    {item.priority}
+                  </span>
+                  <Link href={item.link} className="text-blue-600 hover:underline text-sm">View</Link>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center rounded-lg px-2 py-1 text-xs ${
-                  item.priority === 'high' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 
-                  item.priority === 'medium' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 
-                  'bg-gray-50 text-gray-700 border border-gray-200'
-                }`}>
-                  {item.priority} priority
-                </span>
-                <Link href={`/programs/${encodeURIComponent(item.id)}`} className="text-xs text-gray-600 hover:underline">
-                  <Eye className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* 4. Recent Activity Feed */}
-        <Card>
-          <div className="flex items-center justify-between border-b p-4">
-            <div className="text-sm font-medium">Recent Activity</div>
-            <Link href="/reports" className="text-xs text-gray-600 hover:underline">View Logs</Link>
-          </div>
-          <div className="p-4 space-y-3">
+      {/* 4. Recent Activity */}
+      <Card>
+        <div className="flex items-center justify-between border-b p-4">
+          <div className="text-lg font-semibold">Recent Activity</div>
+          <Link href="/reports" className="text-sm text-blue-600 hover:underline">View All</Link>
+        </div>
+        <div className="p-4">
+          <div className="space-y-3">
             {recentActivity.map((activity, i) => (
-              <Link key={i} href={activity.link} className="block hover:bg-gray-50 rounded-lg p-2 -m-2">
-                <div className="flex items-start gap-3">
-                  <span className="text-lg">{getActivityIcon(activity.type)}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-gray-900">{activity.action}</div>
-                    <div className="text-xs text-gray-500">{activity.time}</div>
-                  </div>
+              <div key={i} className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded-lg">
+                <div className="text-lg">{getActivityIcon(activity.type)}</div>
+                <div className="flex-1">
+                  <div className="text-sm">{activity.action}</div>
+                  <div className="text-xs text-gray-500">{activity.time}</div>
                 </div>
-              </Link>
+                <Link href={activity.link} className="text-blue-600 hover:underline text-sm">
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
             ))}
           </div>
-        </Card>
+        </div>
+      </Card>
 
-        {/* 5. Programs Overview */}
-        <Card>
-          <div className="flex items-center justify-between border-b p-4">
-            <div className="text-sm font-medium">Active Programs</div>
-            <Link href="/programs" className="text-xs text-gray-600 hover:underline">View All</Link>
-          </div>
-          <div className="p-4 space-y-3">
+      {/* 5. Active Programs */}
+      <Card>
+        <div className="flex items-center justify-between border-b p-4">
+          <div className="text-lg font-semibold">Active Programs</div>
+          <Link href="/programs" className="text-sm text-blue-600 hover:underline">View All</Link>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {activePrograms.map((program) => (
-              <div key={program.id} className="rounded-lg border p-3">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0">
-                    <Link href={`/programs/${encodeURIComponent(program.id)}`} className="text-sm font-medium hover:underline block truncate">
-                      {program.name}
-                    </Link>
-                    <div className="text-xs text-gray-500">Ward {program.ward} · {program.budget}</div>
-                  </div>
+              <div key={program.id} className="border rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-medium text-sm">{program.name}</div>
                   <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-xs ${getStatusColor(program.status)}`}>
                     {program.status}
                   </span>
                 </div>
-                {program.progress > 0 && (
-                  <div className="w-full bg-gray-200 rounded-full h-1.5">
-                    <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${program.progress}%` }}></div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      {/* 6. Notifications/Reminders */}
-      <Card>
-        <div className="flex items-center justify-between border-b p-4">
-          <div className="text-sm font-medium">Notifications & Reminders</div>
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-        </div>
-        <div className="p-4">
-          <div className="space-y-3">
-            {notifications.map((notification, i) => (
-              <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${
-                notification.priority === 'high' ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50'
-              }`}>
-                <AlertTriangle className={`h-4 w-4 ${
-                  notification.priority === 'high' ? 'text-rose-500' : 'text-amber-500'
-                }`} />
-                <div className="flex-1">
-                  <div className="text-sm font-medium">{notification.message}</div>
-                  <div className="text-xs text-gray-600">Action required</div>
+                <div className="text-xs text-gray-600 mb-2">Ward {program.ward} • {program.budget}</div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${program.progress}%` }}></div>
                 </div>
-                <button className="text-xs text-gray-600 hover:underline">Dismiss</button>
+                <div className="text-xs text-gray-500 mt-1">{program.progress}% complete</div>
               </div>
             ))}
           </div>
         </div>
       </Card>
 
-      {/* Quick Links */}
+      {/* 6. Notifications & Reminders */}
       <Card>
-        <div className="flex flex-wrap items-center gap-3 p-4">
-          {[
-            { label: "+ Add Program", icon: Plus, href: "/programs/new" },
-            { label: "View Approvals", icon: Clock, href: "/approvals" },
-            { label: "Generate Reports", icon: TrendingUp, href: "/reports" },
-            { label: "System Settings", icon: CheckCircle2, href: "/settings" },
-          ].map((q) => (
-            <Link key={q.label} href={q.href} className="inline-flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm hover:bg-gray-50">
-              <motion.span whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.98 }} className="inline-flex items-center gap-2">
-                <q.icon className="h-4 w-4" /> {q.label}
-              </motion.span>
-            </Link>
-          ))}
+        <div className="flex items-center justify-between border-b p-4">
+          <div className="text-lg font-semibold">Notifications & Reminders</div>
+          <button className="text-sm text-blue-600 hover:underline">Mark All Read</button>
+        </div>
+        <div className="p-4">
+          <div className="space-y-3">
+            {notifications.map((notification, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 border rounded-lg">
+                <AlertTriangle className={`h-5 w-5 mt-0.5 ${notification.priority === 'high' ? 'text-rose-500' : notification.priority === 'medium' ? 'text-amber-500' : 'text-emerald-500'}`} />
+                <div className="flex-1">
+                  <div className="text-sm">{notification.message}</div>
+                  <div className="text-xs text-gray-500">Priority: {notification.priority}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </Card>
     </Shell>
