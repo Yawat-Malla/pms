@@ -9,6 +9,18 @@ import { motion } from "framer-motion";
 import { Search, Upload, Eye, Check, X, Download, MoreHorizontal, Calendar, Building2, FileText, User, Loader2 } from "lucide-react";
 import { HydrationSafe } from "@/components/ui/HydrationSafe";
 
+interface Ward {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface FiscalYear {
+  id: string;
+  year: string;
+  isActive: boolean;
+}
+
 interface Approval {
   id: string;
   programId: string;
@@ -41,6 +53,14 @@ export default function ApprovalsPage() {
   const [selectedModule, setSelectedModule] = useState('');
   const [selectedFiscalYear, setSelectedFiscalYear] = useState('');
 
+  // Dropdown data
+  const [wards, setWards] = useState<Ward[]>([]);
+  const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([]);
+
+  // Bulk actions
+  const [selectedApprovals, setSelectedApprovals] = useState<string[]>([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+
   const fetchApprovals = useCallback(async () => {
     try {
       setLoading(true);
@@ -70,10 +90,91 @@ export default function ApprovalsPage() {
     fetchApprovals();
   }, [fetchApprovals]);
 
+  // Fetch dropdown data on component mount
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        const [wardsRes, fiscalYearsRes] = await Promise.all([
+          fetch('/api/wards'),
+          fetch('/api/fiscyears')
+        ]);
+
+        if (wardsRes.ok) {
+          const wardsData = await wardsRes.json();
+          setWards(wardsData.wards || []);
+        }
+
+        if (fiscalYearsRes.ok) {
+          const fiscalYearsData = await fiscalYearsRes.json();
+          setFiscalYears(fiscalYearsData.fiscalYears || []);
+        }
+      } catch (error) {
+        console.error('Error fetching dropdown data:', error);
+      }
+    };
+
+    fetchDropdownData();
+  }, []);
+
+  const handleExport = async () => {
+    try {
+      const response = await fetch('/api/approvals/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: activeTab,
+          ward: selectedWard,
+          fiscalYear: selectedFiscalYear,
+        }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `approvals-${activeTab}-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Error exporting approvals:', error);
+    }
+  };
+
+  const handleBulkAction = async (action: 'approve' | 'reject') => {
+    if (selectedApprovals.length === 0) return;
+
+    try {
+      const response = await fetch('/api/approvals/bulk', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          approvalIds: selectedApprovals,
+          action,
+        }),
+      });
+
+      if (response.ok) {
+        fetchApprovals();
+        setSelectedApprovals([]);
+        setShowBulkActions(false);
+      }
+    } catch (error) {
+      console.error('Error processing bulk action:', error);
+    }
+  };
+
   const handleApprovalAction = async (approvalId: string, action: 'approve' | 'reject' | 'request_reupload', remarks?: string) => {
     try {
       const response = await fetch('/api/approvals', {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -81,7 +182,6 @@ export default function ApprovalsPage() {
           approvalId,
           action,
           remarks,
-          // TODO: Add userId from session
         }),
       });
 
@@ -169,8 +269,37 @@ export default function ApprovalsPage() {
             <div className="text-xs text-gray-500">Review and approve pending requests from various modules</div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="rounded-xl border px-3 py-2 text-sm">Bulk Actions</button>
-            <button className="rounded-xl bg-gray-900 px-3 py-2 text-sm text-white">Export</button>
+            <div className="relative">
+              <button
+                className="rounded-xl border px-3 py-2 text-sm"
+                onClick={() => setShowBulkActions(!showBulkActions)}
+                disabled={selectedApprovals.length === 0}
+              >
+                Bulk Actions ({selectedApprovals.length})
+              </button>
+              {showBulkActions && selectedApprovals.length > 0 && (
+                <div className="absolute top-full left-0 mt-1 bg-white border rounded-lg shadow-lg z-10 min-w-[150px]">
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                    onClick={() => handleBulkAction('approve')}
+                  >
+                    Approve All
+                  </button>
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                    onClick={() => handleBulkAction('reject')}
+                  >
+                    Reject All
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              className="rounded-xl bg-gray-900 px-3 py-2 text-sm text-white"
+              onClick={handleExport}
+            >
+              Export
+            </button>
           </div>
         </div>
       </Card>
@@ -207,8 +336,8 @@ export default function ApprovalsPage() {
             className="rounded-xl border bg-white px-3 py-2 text-sm"
           >
             <option value="">All Wards</option>
-            {Array.from({length: 20}).map((_,i) => (
-              <option key={i+1} value={`ward-${i+1}`}>Ward {i+1}</option>
+            {wards.map((ward) => (
+              <option key={ward.id} value={ward.id}>{ward.name}</option>
             ))}
           </select>
           <select
@@ -217,8 +346,9 @@ export default function ApprovalsPage() {
             className="rounded-xl border bg-white px-3 py-2 text-sm"
           >
             <option value="">All Fiscal Years</option>
-            <option value="2024/25">2024/25</option>
-            <option value="2025/26">2025/26</option>
+            {fiscalYears.map((fy) => (
+              <option key={fy.id} value={fy.id}>{fy.year}</option>
+            ))}
           </select>
         </div>
       </Card>

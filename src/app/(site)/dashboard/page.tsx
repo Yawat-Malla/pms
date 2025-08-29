@@ -81,8 +81,8 @@ export default function DashboardPage() {
         const [statsRes, wardStatsRes, activityRes, notificationsRes] = await Promise.all([
           fetch('/api/dashboard/stats'),
           fetch('/api/dashboard/ward-stats'),
-          fetch('/api/activity-logs?limit=5'),
-          fetch('/api/notifications?limit=3&isRead=false')
+          fetch('/api/dashboard/recent-activity?limit=5'),
+          fetch('/api/notifications?limit=3&unread=true')
         ]);
 
         if (statsRes.ok) {
@@ -97,7 +97,7 @@ export default function DashboardPage() {
 
         if (activityRes.ok) {
           const data = await activityRes.json();
-          setActivityLogs(data.activityLogs || []);
+          setActivityLogs(data.activities || []);
         }
 
         if (notificationsRes.ok) {

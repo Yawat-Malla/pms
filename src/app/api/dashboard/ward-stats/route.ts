@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma, ensureDbExists } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function GET() {
   try {
     await ensureDbExists();
+
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Get current fiscal year
     const currentFiscalYear = await prisma.fiscalYear.findFirst({
@@ -41,11 +48,11 @@ export async function GET() {
         return sum + (Number(program.budget) || 0);
       }, 0);
 
-      // Calculate total spent (approved payments)
+      // Calculate total spent from payments
       const totalSpent = programs.reduce((sum, program) => {
-        const programSpent = program.payments.reduce((paymentSum, payment) => {
-          return paymentSum + Number(payment.amount);
-        }, 0);
+        const programSpent = program.payments
+          .filter(payment => payment.status === 'approved')
+          .reduce((paymentSum, payment) => paymentSum + Number(payment.amount), 0);
         return sum + programSpent;
       }, 0);
 
@@ -53,8 +60,8 @@ export async function GET() {
         ward: `Ward ${ward.code}`,
         wardName: ward.name,
         programs: programCount,
-        budget: `Rs. ${(totalBudget / 1000000).toFixed(1)}M`,
-        spent: `Rs. ${(totalSpent / 1000000).toFixed(1)}M`,
+        budget: `₦${(totalBudget / 1000000).toFixed(1)}M`,
+        spent: `₦${(totalSpent / 1000000).toFixed(1)}M`,
         budgetRaw: totalBudget,
         spentRaw: totalSpent,
         spentPercentage: totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0

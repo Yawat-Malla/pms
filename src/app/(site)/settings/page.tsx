@@ -89,6 +89,18 @@ async function getJSON<T extends Record<string, unknown>>(
   return json[String(key)] as T[keyof T];
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  wardId?: string;
+  ward?: {
+    id: string;
+    name: string;
+  };
+}
+
 // =================== PAGE ===================
 export default function SettingsPage() {
   // Data
@@ -96,6 +108,18 @@ export default function SettingsPage() {
   const [wards, setWards] = useState<Ward[]>([]);
   const [programTypes, setProgramTypes] = useState<ProgramType[]>([]);
   const [fundingSources, setFundingSources] = useState<FundingSource[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+
+  // User management modal state
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userForm, setUserForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'user',
+    wardId: ''
+  });
 
   // Inline add forms
   const [showAddFiscalYearForm, setShowAddFiscalYearForm] = useState(false);
@@ -128,6 +152,7 @@ export default function SettingsPage() {
     fetchWards();
     fetchProgramTypes();
     fetchFundingSources();
+    fetchUsers();
   }, []);
 
   // --------- Fetchers ----------
@@ -174,6 +199,16 @@ export default function SettingsPage() {
     } catch {
       toast.error("Failed to load funding sources");
       setFundingSources([]);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const data = await getJSON<{ users: User[] }>("/api/users", "users");
+      setUsers(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error("Failed to load users");
+      setUsers([]);
     }
   };
 
@@ -382,6 +417,95 @@ export default function SettingsPage() {
     setDeletingFundingSource(null);
   };
 
+  // --------- CRUD: Users ----------
+  const handleAddUser = async () => {
+    try {
+      if (!userForm.name.trim() || !userForm.email.trim()) {
+        return toast.error("Name and email are required");
+      }
+
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userForm),
+      });
+
+      if (res.ok) {
+        toast.success("User added successfully");
+        setUserForm({ name: '', email: '', password: '', role: 'user', wardId: '' });
+        setShowUserModal(false);
+        fetchUsers();
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to add user");
+      }
+    } catch {
+      toast.error("Failed to add user");
+    }
+  };
+
+  const handleEditUser = async () => {
+    if (!editingUser) return;
+
+    try {
+      const res = await fetch(`/api/users/${editingUser.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userForm),
+      });
+
+      if (res.ok) {
+        toast.success("User updated successfully");
+        setEditingUser(null);
+        setUserForm({ name: '', email: '', password: '', role: 'user', wardId: '' });
+        setShowUserModal(false);
+        fetchUsers();
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to update user");
+      }
+    } catch {
+      toast.error("Failed to update user");
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Are you sure you want to delete this user?")) return;
+
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        toast.success("User deleted successfully");
+        fetchUsers();
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to delete user");
+      }
+    } catch {
+      toast.error("Failed to delete user");
+    }
+  };
+
+  const openUserModal = (user?: User) => {
+    if (user) {
+      setEditingUser(user);
+      setUserForm({
+        name: user.name,
+        email: user.email,
+        password: '',
+        role: user.role,
+        wardId: user.wardId || ''
+      });
+    } else {
+      setEditingUser(null);
+      setUserForm({ name: '', email: '', password: '', role: 'user', wardId: '' });
+    }
+    setShowUserModal(true);
+  };
+
   // =================== RENDER ===================
   return (
     <Shell rightRail={<><RecentWork /><TimeManagement /><UpcomingDeadlines /></>}>
@@ -395,6 +519,7 @@ export default function SettingsPage() {
             <motion.button
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => openUserModal()}
               className="inline-flex items-center gap-2 rounded-xl bg-gray-900 px-3 py-2 text-xs text-white"
             >
               <UserPlus className="h-3 w-3" /> Add User
@@ -402,27 +527,35 @@ export default function SettingsPage() {
           </div>
           <div className="p-4">
             <div className="mb-3 rounded-xl border">
-              {[
-                { name: "Alex Parker", role: "Admin" },
-                { name: "Sam Kim", role: "Ward Secretary" },
-                { name: "Riya Mehta", role: "Planning Officer" },
-                { name: "CAO Office", role: "CAO" },
-              ].map((u) => (
-                <div key={u.name} className="flex items-center justify-between border-b p-3 last:border-b-0">
+              {users.length > 0 ? users.map((user) => (
+                <div key={user.id} className="flex items-center justify-between border-b p-3 last:border-b-0">
                   <div>
-                    <div className="text-sm font-medium">{u.name}</div>
-                    <div className="text-xs text-gray-500">Role: {u.role}</div>
+                    <div className="text-sm font-medium">{user.name}</div>
+                    <div className="text-xs text-gray-500">
+                      Role: {user.role} | Email: {user.email}
+                      {user.ward && ` | Ward: ${user.ward.name}`}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
-                    <button className="rounded-lg border px-2 py-1">
+                    <button
+                      className="rounded-lg border px-2 py-1"
+                      onClick={() => openUserModal(user)}
+                    >
                       <Edit3 className="mr-1 inline h-3 w-3" /> Edit
                     </button>
-                    <button className="rounded-lg border px-2 py-1 text-rose-600">
+                    <button
+                      className="rounded-lg border px-2 py-1 text-rose-600"
+                      onClick={() => handleDeleteUser(user.id)}
+                    >
                       <Trash2 className="mr-1 inline h-3 w-3" /> Delete
                     </button>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="p-4 text-center text-sm text-gray-500">
+                  No users found. Click &quot;Add User&quot; to create one.
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
@@ -1173,6 +1306,99 @@ export default function SettingsPage() {
           </div>
         </Card>
       </div>
+
+      {/* User Modal */}
+      {showUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4">
+              {editingUser ? 'Edit User' : 'Add New User'}
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={userForm.name}
+                  onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
+                  placeholder="Enter user name"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={userForm.email}
+                  onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+                  placeholder="Enter email address"
+                />
+              </div>
+
+              {!editingUser && (
+                <div>
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={userForm.password}
+                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                    placeholder="Enter password"
+                  />
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="role">Role</Label>
+                <select
+                  id="role"
+                  value={userForm.role}
+                  onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+                  className="w-full rounded-xl border bg-white px-3 py-2"
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                  <option value="approver">Approver</option>
+                  <option value="ward_officer">Ward Officer</option>
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="ward">Ward (Optional)</Label>
+                <select
+                  id="ward"
+                  value={userForm.wardId}
+                  onChange={(e) => setUserForm({ ...userForm, wardId: e.target.value })}
+                  className="w-full rounded-xl border bg-white px-3 py-2"
+                >
+                  <option value="">Select Ward</option>
+                  {wards.map((ward) => (
+                    <option key={ward.id} value={ward.id}>{ward.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-6">
+              <button
+                onClick={editingUser ? handleEditUser : handleAddUser}
+                className="flex-1 bg-gray-900 text-white rounded-xl px-4 py-2 text-sm"
+              >
+                {editingUser ? 'Update User' : 'Add User'}
+              </button>
+              <button
+                onClick={() => setShowUserModal(false)}
+                className="flex-1 border rounded-xl px-4 py-2 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }

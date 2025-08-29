@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma, ensureDbExists } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 import { ProgramStatus } from "@prisma/client";
 
@@ -15,6 +17,11 @@ const approvalActionSchema = z.object({
 export async function GET(request: Request) {
   try {
     await ensureDbExists();
+
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'pending';
@@ -249,5 +256,129 @@ function getPriorityFromStep(step: string): string {
     case "cao": return "high";
     case "planning_officer": return "medium";
     default: return "low";
+  }
+}
+
+// PUT - Update approval status (approve/reject)
+export async function PUT(request: Request) {
+  try {
+    await ensureDbExists();
+
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { approvalId, action, remarks } = body;
+
+    if (!approvalId || !action) {
+      return NextResponse.json(
+        { error: "Approval ID and action are required" },
+        { status: 400 }
+      );
+    }
+
+    // Find the approval
+    const approval = await prisma.programApproval.findUnique({
+      where: { id: approvalId },
+      include: {
+        program: {
+          include: {
+            ward: true,
+            fiscalYear: true
+          }
+        }
+      }
+    });
+
+    if (!approval) {
+      return NextResponse.json(
+        { error: "Approval not found" },
+        { status: 404 }
+      );
+    }
+
+    if (approval.status !== "pending") {
+      return NextResponse.json(
+        { error: "This approval has already been processed" },
+        { status: 400 }
+      );
+    }
+
+    let newStatus: string;
+    let programStatus: ProgramStatus | undefined;
+
+    switch (action) {
+      case "approve":
+        newStatus = "approved";
+        if (approval.step === "cao") {
+          programStatus = ProgramStatus.APPROVED;
+        }
+        break;
+      case "reject":
+        newStatus = "rejected";
+        if (approval.step === "cao") {
+          programStatus = ProgramStatus.DRAFT; // Reset to draft for rejection
+        }
+        break;
+      default:
+        return NextResponse.json(
+          { error: "Invalid action" },
+          { status: 400 }
+        );
+    }
+
+    // Update approval
+    const updatedApproval = await prisma.programApproval.update({
+      where: { id: approvalId },
+      data: {
+        status: newStatus,
+        remarks: remarks,
+        approvedById: session.user.id,
+        approvedAt: newStatus === "approved" ? new Date() : null
+      },
+      include: {
+        program: true,
+        approvedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    // Update program status if needed
+    if (programStatus) {
+      await prisma.program.update({
+        where: { id: approval.programId },
+        data: { status: programStatus }
+      });
+    }
+
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        action: `approval_${action}d`,
+        description: `Approval ${action}d for program: ${approval.program.name}`,
+        entityType: "approval",
+        entityId: approval.id,
+        userId: session.user.id
+      }
+    });
+
+    return NextResponse.json({
+      message: `Approval ${action}d successfully`,
+      approval: updatedApproval
+    });
+
+  } catch (error) {
+    console.error("Error updating approval:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

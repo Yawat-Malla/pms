@@ -1,20 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma, ensureDbExists } from "@/lib/prisma";
+import { z } from "zod";
+
+const createFiscalYearSchema = z.object({
+  year: z.string().min(1, "Year is required"),
+  isActive: z.boolean().default(false)
+});
+
+const updateFiscalYearSchema = z.object({
+  id: z.string().min(1, "ID is required"),
+  year: z.string().optional(),
+  isActive: z.boolean().optional()
+});
 
 // GET all fiscal years
 export async function GET() {
   try {
     // Ensure database exists before querying
     await ensureDbExists();
-    
+
     const fiscalYears = await prisma.fiscalYear.findMany({
       orderBy: {
         year: "desc"
       }
     });
-    
+
     return NextResponse.json({ fiscalYears });
-    
+
   } catch (error) {
     console.error("Error fetching fiscal years:", error);
     return NextResponse.json(
@@ -28,50 +40,47 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     await ensureDbExists();
-    
+
     const body = await request.json();
-    const { year, isActive } = body;
-    
-    // Validation
-    if (!year || typeof year !== 'string') {
-      return NextResponse.json(
-        { error: "Year is required and must be a string" },
-        { status: 400 }
-      );
-    }
-    
+    const validatedData = createFiscalYearSchema.parse(body);
+
     // Check if fiscal year already exists
     const existingFiscalYear = await prisma.fiscalYear.findUnique({
-      where: { year }
+      where: { year: validatedData.year }
     });
-    
+
     if (existingFiscalYear) {
       return NextResponse.json(
         { error: "Fiscal year already exists" },
         { status: 400 }
       );
     }
-    
-    // If this fiscal year is set as active, deactivate all others
-    if (isActive) {
+
+    // If setting as active, deactivate all other fiscal years
+    if (validatedData.isActive) {
       await prisma.fiscalYear.updateMany({
         where: { isActive: true },
         data: { isActive: false }
       });
     }
-    
+
     // Create the fiscal year
     const fiscalYear = await prisma.fiscalYear.create({
-      data: {
-        year,
-        isActive: isActive || false
-      }
+      data: validatedData
     });
-    
+
     return NextResponse.json({ fiscalYear }, { status: 201 });
-    
+
   } catch (error) {
     console.error("Error creating fiscal year:", error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation failed", details: error.issues },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -83,54 +92,54 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     await ensureDbExists();
-    
+
     const body = await request.json();
-    const { id, year, isActive } = body;
-    
-    // Validation
-    if (!id) {
-      return NextResponse.json(
-        { error: "Fiscal year ID is required" },
-        { status: 400 }
-      );
-    }
-    
+    const validatedData = updateFiscalYearSchema.parse(body);
+
     // Check if fiscal year exists
     const existingFiscalYear = await prisma.fiscalYear.findUnique({
-      where: { id }
+      where: { id: validatedData.id }
     });
-    
+
     if (!existingFiscalYear) {
       return NextResponse.json(
         { error: "Fiscal year not found" },
         { status: 404 }
       );
     }
-    
-    // If this fiscal year is set as active, deactivate all others
-    if (isActive) {
+
+    // If setting as active, deactivate all other fiscal years
+    if (validatedData.isActive) {
       await prisma.fiscalYear.updateMany({
-        where: { 
+        where: {
           isActive: true,
-          id: { not: id }
+          id: { not: validatedData.id }
         },
         data: { isActive: false }
       });
     }
-    
+
     // Update the fiscal year
     const updatedFiscalYear = await prisma.fiscalYear.update({
-      where: { id },
+      where: { id: validatedData.id },
       data: {
-        year: year || undefined,
-        isActive: isActive !== undefined ? isActive : undefined
+        year: validatedData.year,
+        isActive: validatedData.isActive
       }
     });
-    
+
     return NextResponse.json({ fiscalYear: updatedFiscalYear });
-    
+
   } catch (error) {
     console.error("Error updating fiscal year:", error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation failed", details: error.issues },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -139,48 +148,50 @@ export async function PUT(request: Request) {
 }
 
 // DELETE - Delete a fiscal year
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     await ensureDbExists();
-    
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    
+
     if (!id) {
       return NextResponse.json(
         { error: "Fiscal year ID is required" },
         { status: 400 }
       );
     }
-    
+
     // Check if fiscal year exists
     const existingFiscalYear = await prisma.fiscalYear.findUnique({
       where: { id },
-      include: { programs: { select: { id: true } } }
+      include: {
+        programs: true
+      }
     });
-    
+
     if (!existingFiscalYear) {
       return NextResponse.json(
         { error: "Fiscal year not found" },
         { status: 404 }
       );
     }
-    
-    // Check if fiscal year is in use
+
+    // Check if fiscal year has associated programs
     if (existingFiscalYear.programs.length > 0) {
       return NextResponse.json(
-        { error: "Cannot delete fiscal year that is in use by programs" },
+        { error: "Cannot delete fiscal year with associated programs" },
         { status: 400 }
       );
     }
-    
+
     // Delete the fiscal year
     await prisma.fiscalYear.delete({
       where: { id }
     });
-    
-    return NextResponse.json({ success: true });
-    
+
+    return NextResponse.json({ message: "Fiscal year deleted successfully" });
+
   } catch (error) {
     console.error("Error deleting fiscal year:", error);
     return NextResponse.json(

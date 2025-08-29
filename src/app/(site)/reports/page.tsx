@@ -9,6 +9,18 @@ import { motion } from "framer-motion";
 import { Filter, Search, Download, FileText, BarChart3, TrendingUp, Calendar, Building2, Eye, Printer, FileSpreadsheet, Loader2 } from "lucide-react";
 import Link from "next/link";
 
+interface Ward {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface FiscalYear {
+  id: string;
+  year: string;
+  isActive: boolean;
+}
+
 interface Report {
   id: string;
   name: string;
@@ -29,9 +41,36 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
+
+  // Dropdown data
+  const [wards, setWards] = useState<Ward[]>([]);
+  const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([]);
+
   useEffect(() => {
     fetchReports();
+    fetchDropdownData();
   }, []);
+
+  const fetchDropdownData = async () => {
+    try {
+      const [wardsRes, fiscalYearsRes] = await Promise.all([
+        fetch('/api/wards'),
+        fetch('/api/fiscyears')
+      ]);
+
+      if (wardsRes.ok) {
+        const wardsData = await wardsRes.json();
+        setWards(wardsData.wards || []);
+      }
+
+      if (fiscalYearsRes.ok) {
+        const fiscalYearsData = await fiscalYearsRes.json();
+        setFiscalYears(fiscalYearsData.fiscalYears || []);
+      }
+    } catch (error) {
+      console.error('Error fetching dropdown data:', error);
+    }
+  };
 
   const fetchReports = async () => {
     try {
@@ -51,27 +90,41 @@ export default function ReportsPage() {
     }
   };
 
-  const generateReport = async (type: string, name: string) => {
+  const generateReport = async (type: string, name: string, filters?: Record<string, unknown>) => {
     try {
       setGenerating(type);
-      const response = await fetch('/api/reports', {
+      setError(null);
+
+      const response = await fetch('/api/reports/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name,
           type,
-          parameters: {
-            format: 'pdf',
-            includeCharts: true,
-            includeDataTables: true,
-            includeMetadata: true
-          }
+          title: name,
+          filters: filters || {}
         }),
       });
 
       if (response.ok) {
+        const data = await response.json();
+
+        // Generate PDF from HTML content
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(data.report.htmlContent);
+          printWindow.document.close();
+
+          // Wait for content to load then print
+          printWindow.onload = () => {
+            setTimeout(() => {
+              printWindow.print();
+              printWindow.close();
+            }, 500);
+          };
+        }
+
         // Refresh reports list
         fetchReports();
       } else {
@@ -103,8 +156,21 @@ export default function ReportsPage() {
             <div className="text-xs text-gray-500">Generate comprehensive reports and export data in various formats</div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="rounded-xl border px-3 py-2 text-sm">Report History</button>
-            <button className="rounded-xl bg-gray-900 px-3 py-2 text-sm text-white">+ New Report</button>
+            <button
+              className="rounded-xl border px-3 py-2 text-sm"
+              onClick={() => {
+                // Scroll to recent reports section
+                document.getElementById('recent-reports')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            >
+              Report History
+            </button>
+            <button
+              className="rounded-xl bg-gray-900 px-3 py-2 text-sm text-white"
+              onClick={() => generateReport('custom', `Custom Report - ${new Date().toLocaleDateString()}`)}
+            >
+              + New Report
+            </button>
           </div>
         </div>
       </Card>
@@ -127,15 +193,16 @@ export default function ReportsPage() {
             <option>Performance Report</option>
           </select>
           <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Ward</option>
-            {Array.from({length: 20}).map((_,i) => (
-              <option key={i+1}>Ward {i+1}</option>
+            <option value="">All Wards</option>
+            {wards.map((ward) => (
+              <option key={ward.id} value={ward.id}>{ward.name}</option>
             ))}
           </select>
           <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Fiscal Year</option>
-            <option>2024/25</option>
-            <option>2025/26</option>
+            <option value="">All Fiscal Years</option>
+            {fiscalYears.map((fy) => (
+              <option key={fy.id} value={fy.id}>{fy.year}</option>
+            ))}
           </select>
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-gray-400" />
@@ -190,24 +257,39 @@ export default function ReportsPage() {
       <Card>
         <div className="flex flex-wrap items-center gap-3 p-4">
           <div className="text-sm font-medium">Quick Actions:</div>
-          <motion.button 
-            whileHover={{ y: -1 }} 
-            whileTap={{ scale: 0.98 }} 
+          <motion.button
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.98 }}
             className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-gray-50"
+            onClick={() => generateReport('custom', 'All Programs Export')}
           >
             <FileSpreadsheet className="h-4 w-4" /> Export All Programs
           </motion.button>
-          <motion.button 
-            whileHover={{ y: -1 }} 
-            whileTap={{ scale: 0.98 }} 
+          <motion.button
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.98 }}
             className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-gray-50"
+            onClick={() => generateReport('status', 'Programs Summary Report')}
           >
             <Printer className="h-4 w-4" /> Print Summary
           </motion.button>
-          <motion.button 
-            whileHover={{ y: -1 }} 
-            whileTap={{ scale: 0.98 }} 
+          <motion.button
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.98 }}
             className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm hover:bg-gray-50"
+            onClick={() => {
+              // Create and download a sample template
+              const csvContent = "Program Code,Program Name,Ward,Fiscal Year,Budget,Status\nSample001,Sample Program,Ward 1,2024/25,100000,DRAFT";
+              const blob = new Blob([csvContent], { type: 'text/csv' });
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'program-template.csv';
+              document.body.appendChild(a);
+              a.click();
+              window.URL.revokeObjectURL(url);
+              document.body.removeChild(a);
+            }}
           >
             <Download className="h-4 w-4" /> Download Templates
           </motion.button>
@@ -215,7 +297,8 @@ export default function ReportsPage() {
       </Card>
 
       {/* Recent Reports */}
-      <Card>
+      <div id="recent-reports">
+        <Card>
         <div className="flex items-center justify-between border-b p-4">
           <div className="text-lg font-semibold">Recent Reports</div>
           <Link href="#" className="text-sm text-blue-600 hover:underline">View All</Link>
@@ -279,7 +362,8 @@ export default function ReportsPage() {
             )}
           </div>
         </div>
-      </Card>
+        </Card>
+      </div>
 
       {/* Export Options */}
       <Card>

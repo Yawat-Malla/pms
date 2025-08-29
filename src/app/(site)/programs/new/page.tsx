@@ -170,15 +170,62 @@ export default function CreateProgramPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const uploadFiles = async (files: FileItem[], category: string) => {
+    const uploadedFiles = [];
+
+    for (const fileItem of files) {
+      const formData = new FormData();
+      formData.append('file', fileItem.file);
+
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          uploadedFiles.push({
+            name: fileItem.file.name,
+            type: category,
+            fileUrl: result.file.url,
+            fileSize: result.file.size,
+            mimeType: result.file.type,
+          });
+        } else {
+          throw new Error(`Failed to upload ${fileItem.file.name}`);
+        }
+      } catch (error) {
+        console.error(`Error uploading ${fileItem.file.name}:`, error);
+        throw error;
+      }
+    }
+
+    return uploadedFiles;
+  };
+
+  const handleSubmit = async (submitForApproval = false) => {
     if (!validateForm()) return;
-    
+
     setIsSubmitting(true);
-    
+
     try {
+      // Upload files first
+      const uploadedDocuments = [];
+
+      if (redBookFiles.length > 0) {
+        const redBookUploads = await uploadFiles(redBookFiles, 'red_book');
+        uploadedDocuments.push(...redBookUploads);
+      }
+
+      if (execFiles.length > 0) {
+        const execUploads = await uploadFiles(execFiles, 'executive_approval');
+        uploadedDocuments.push(...execUploads);
+      }
+
       // Parse tags
       const tags = form.tags ? form.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : [];
-      
+
       const programData = {
         code: form.code,
         name: form.name.trim(),
@@ -192,6 +239,8 @@ export default function CreateProgramPage() {
         endDate: form.endDate || undefined,
         tags,
         responsibleOfficer: form.officer.trim() || undefined,
+        status: submitForApproval ? 'SUBMITTED' : 'DRAFT',
+        documents: uploadedDocuments,
       };
 
       const response = await fetch('/api/programs', {
@@ -205,13 +254,13 @@ export default function CreateProgramPage() {
       if (response.ok) {
         const result = await response.json();
         console.log('Program created:', result);
-        
+
         // Redirect to programs list
         router.push('/programs');
       } else {
         const errorData = await response.json();
         console.error('Error creating program:', errorData);
-        
+
         if (errorData.error === "Program code already exists") {
           setErrors({ code: "Program code already exists" });
         } else if (errorData.error === "Ward not found") {
@@ -485,20 +534,20 @@ export default function CreateProgramPage() {
                 </select>
               </div>
               <div className="flex flex-wrap items-center gap-2 pt-2">
-                <motion.button 
-                  whileHover={{ y: -2 }} 
-                  whileTap={{ scale: 0.98 }} 
-                  onClick={() => handleSubmit()}
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleSubmit(false)}
                   disabled={isSubmitting}
                   className="rounded-xl border px-3 py-2 text-sm disabled:opacity-50"
                 >
                   {isSubmitting ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> : null}
                   Save Draft
                 </motion.button>
-                <motion.button 
-                  whileHover={{ y: -2 }} 
-                  whileTap={{ scale: 0.98 }} 
-                  onClick={() => handleSubmit()}
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleSubmit(true)}
                   disabled={isSubmitting}
                   className="rounded-xl bg-gray-900 px-3 py-2 text-sm text-white disabled:opacity-50"
                 >

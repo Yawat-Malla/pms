@@ -1,5 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma, ensureDbExists } from "@/lib/prisma";
+import { z } from "zod";
+
+const createProgramTypeSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  code: z.string().min(1, "Code is required")
+});
+
+const updateProgramTypeSchema = z.object({
+  id: z.string().min(1, "ID is required"),
+  name: z.string().optional(),
+  code: z.string().optional()
+});
 
 // GET all program types
 export async function GET() {
@@ -28,35 +40,20 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     await ensureDbExists();
-    
+
     const body = await request.json();
-    const { name, code } = body;
-    
-    // Validation
-    if (!name || typeof name !== 'string') {
-      return NextResponse.json(
-        { error: "Name is required and must be a string" },
-        { status: 400 }
-      );
-    }
-    
-    if (!code || typeof code !== 'string') {
-      return NextResponse.json(
-        { error: "Code is required and must be a string" },
-        { status: 400 }
-      );
-    }
-    
+    const validatedData = createProgramTypeSchema.parse(body);
+
     // Check if program type already exists
     const existingProgramType = await prisma.programType.findFirst({
       where: {
         OR: [
-          { name },
-          { code }
+          { name: validatedData.name },
+          { code: validatedData.code }
         ]
       }
     });
-    
+
     if (existingProgramType) {
       return NextResponse.json(
         { error: "Program type with this name or code already exists" },
@@ -66,16 +63,21 @@ export async function POST(request: Request) {
     
     // Create the program type
     const programType = await prisma.programType.create({
-      data: {
-        name,
-        code
-      }
+      data: validatedData
     });
-    
+
     return NextResponse.json({ programType }, { status: 201 });
-    
+
   } catch (error) {
     console.error("Error creating program type:", error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation failed", details: error.issues },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -87,42 +89,34 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     await ensureDbExists();
-    
+
     const body = await request.json();
-    const { id, name, code } = body;
-    
-    // Validation
-    if (!id) {
-      return NextResponse.json(
-        { error: "Program type ID is required" },
-        { status: 400 }
-      );
-    }
-    
+    const validatedData = updateProgramTypeSchema.parse(body);
+
     // Check if program type exists
     const existingProgramType = await prisma.programType.findUnique({
-      where: { id }
+      where: { id: validatedData.id }
     });
-    
+
     if (!existingProgramType) {
       return NextResponse.json(
         { error: "Program type not found" },
         { status: 404 }
       );
     }
-    
-    // Check if name or code already exists for another program type
-    if (name || code) {
+
+    // Check for duplicates if name or code is being updated
+    if (validatedData.name || validatedData.code) {
       const duplicateProgramType = await prisma.programType.findFirst({
         where: {
           OR: [
-            name ? { name } : {},
-            code ? { code } : {}
+            validatedData.name ? { name: validatedData.name } : {},
+            validatedData.code ? { code: validatedData.code } : {}
           ],
-          id: { not: id }
+          id: { not: validatedData.id }
         }
       });
-      
+
       if (duplicateProgramType) {
         return NextResponse.json(
           { error: "Another program type with this name or code already exists" },
@@ -130,20 +124,28 @@ export async function PUT(request: Request) {
         );
       }
     }
-    
+
     // Update the program type
     const updatedProgramType = await prisma.programType.update({
-      where: { id },
+      where: { id: validatedData.id },
       data: {
-        name: name || undefined,
-        code: code || undefined
+        name: validatedData.name,
+        code: validatedData.code
       }
     });
-    
+
     return NextResponse.json({ programType: updatedProgramType });
-    
+
   } catch (error) {
     console.error("Error updating program type:", error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation failed", details: error.issues },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -152,48 +154,50 @@ export async function PUT(request: Request) {
 }
 
 // DELETE - Delete a program type
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     await ensureDbExists();
-    
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    
+
     if (!id) {
       return NextResponse.json(
         { error: "Program type ID is required" },
         { status: 400 }
       );
     }
-    
-    // Check if program type exists
+
+    // Check if program type exists and has associated programs
     const existingProgramType = await prisma.programType.findUnique({
       where: { id },
-      include: { programs: { select: { id: true } } }
+      include: {
+        programs: true
+      }
     });
-    
+
     if (!existingProgramType) {
       return NextResponse.json(
         { error: "Program type not found" },
         { status: 404 }
       );
     }
-    
-    // Check if program type is in use
+
+    // Check if program type has associated programs
     if (existingProgramType.programs.length > 0) {
       return NextResponse.json(
-        { error: "Cannot delete program type that is in use by programs" },
+        { error: "Cannot delete program type with associated programs" },
         { status: 400 }
       );
     }
-    
+
     // Delete the program type
     await prisma.programType.delete({
       where: { id }
     });
-    
-    return NextResponse.json({ success: true });
-    
+
+    return NextResponse.json({ message: "Program type deleted successfully" });
+
   } catch (error) {
     console.error("Error deleting program type:", error);
     return NextResponse.json(

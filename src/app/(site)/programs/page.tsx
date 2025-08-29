@@ -7,7 +7,26 @@ import { TimeManagement } from "@/components/widgets/TimeManagement";
 import { UpcomingDeadlines } from "@/components/widgets/UpcomingDeadlines";
 import { Search, Grid3X3, List, ArrowUpDown, Pencil, Printer, Loader2, Eye } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { HydrationSafe } from "@/components/ui/HydrationSafe";
+
+interface Ward {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface FiscalYear {
+  id: string;
+  year: string;
+  isActive: boolean;
+}
+
+interface ProgramType {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface Program {
   id: string;
@@ -46,6 +65,7 @@ interface Program {
 }
 
 export default function ProgramsPage() {
+  const router = useRouter();
   const [view, setView] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -54,7 +74,7 @@ export default function ProgramsPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState({
+  const [, setPagination] = useState({
     page: 1,
     totalPages: 1,
     totalCount: 0,
@@ -62,12 +82,20 @@ export default function ProgramsPage() {
     hasPreviousPage: false
   });
 
+  // Dropdown data
+  const [wards, setWards] = useState<Ward[]>([]);
+  const [fiscalYears, setFiscalYears] = useState<FiscalYear[]>([]);
+  const [programTypes, setProgramTypes] = useState<ProgramType[]>([]);
+
+  // Debounced search query
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+
   // Filter states
   const [selectedWard, setSelectedWard] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("");
   const [selectedFiscalYear, setSelectedFiscalYear] = useState("");
-  const [sortBy, setSortBy] = useState("createdAt");
-  const [sortOrder, setSortOrder] = useState("desc");
+  const [sortBy] = useState("createdAt");
+  const [sortOrder] = useState("desc");
 
   // Fetch programs from API
   useEffect(() => {
@@ -75,7 +103,7 @@ export default function ProgramsPage() {
       try {
         setLoading(true);
         const params = new URLSearchParams({
-          search: query,
+          search: debouncedQuery,
           wardId: selectedWard,
           status: selectedStatus,
           fiscalYearId: selectedFiscalYear,
@@ -107,7 +135,48 @@ export default function ProgramsPage() {
     };
 
     fetchPrograms();
-  }, [query, selectedWard, selectedStatus, selectedFiscalYear, sortBy, sortOrder, page, perPage]);
+  }, [debouncedQuery, selectedWard, selectedStatus, selectedFiscalYear, sortBy, sortOrder, page, perPage]);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Fetch dropdown data on component mount
+  useEffect(() => {
+    const fetchDropdownData = async () => {
+      try {
+        const [wardsRes, fiscalYearsRes, programTypesRes] = await Promise.all([
+          fetch('/api/wards'),
+          fetch('/api/fiscyears'),
+          fetch('/api/programtypes')
+        ]);
+
+        if (wardsRes.ok) {
+          const wardsData = await wardsRes.json();
+          setWards(wardsData.wards || []);
+        }
+
+        if (fiscalYearsRes.ok) {
+          const fiscalYearsData = await fiscalYearsRes.json();
+          setFiscalYears(fiscalYearsData.fiscalYears || []);
+        }
+
+        if (programTypesRes.ok) {
+          const programTypesData = await programTypesRes.json();
+          setProgramTypes(programTypesData.programTypes || []);
+        }
+      } catch (error) {
+        console.error('Error fetching dropdown data:', error);
+      }
+    };
+
+    fetchDropdownData();
+  }, []);
 
   const filtered = useMemo(() =>
     programs.filter(p =>
@@ -211,28 +280,45 @@ export default function ProgramsPage() {
               className="w-full rounded-xl border px-3 py-2 pl-10 text-sm"
             />
           </div>
-          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Fiscal Year</option>
-            <option>2024/25</option>
-            <option>2025/26</option>
-          </select>
-          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Ward</option>
-            {Array.from({length: 20}).map((_,i) => (
-              <option key={i+1}>Ward {i+1}</option>
+          <select
+            className="rounded-xl border bg-white px-3 py-2 text-sm"
+            value={selectedFiscalYear}
+            onChange={(e) => setSelectedFiscalYear(e.target.value)}
+          >
+            <option value="">All Fiscal Years</option>
+            {fiscalYears.map((fy) => (
+              <option key={fy.id} value={fy.id}>{fy.year}</option>
             ))}
           </select>
-          <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Status</option>
-            <option>Draft</option>
-            <option>Submitted</option>
-            <option>Approved</option>
-            <option>Completed</option>
+          <select
+            className="rounded-xl border bg-white px-3 py-2 text-sm"
+            value={selectedWard}
+            onChange={(e) => setSelectedWard(e.target.value)}
+          >
+            <option value="">All Wards</option>
+            {wards.map((ward) => (
+              <option key={ward.id} value={ward.id}>{ward.name}</option>
+            ))}
+          </select>
+          <select
+            className="rounded-xl border bg-white px-3 py-2 text-sm"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+          >
+            <option value="">All Status</option>
+            <option value="DRAFT">Draft</option>
+            <option value="SUBMITTED">Submitted</option>
+            <option value="APPROVED">Approved</option>
+            <option value="ACTIVE">Active</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="CLOSED">Closed</option>
           </select>
           <select className="rounded-xl border bg-white px-3 py-2 text-sm">
-            <option>Program Type</option>
-            <option>New</option>
-            <option>Carried-over</option>
+            <option value="">All Program Types</option>
+            {programTypes.map((type) => (
+              <option key={type.id} value={type.id}>{type.name}</option>
+            ))}
           </select>
           <div className="ml-auto flex items-center gap-2">
             <div className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
@@ -261,8 +347,9 @@ export default function ProgramsPage() {
       {view === "grid" ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {pageItems.map((program) => (
-            <Card key={program.id} className="group cursor-pointer hover:shadow-lg transition-shadow">
-              <div className="p-4">
+            <div key={program.id} className="cursor-pointer" onClick={() => router.push(`/programs/${program.id}`)}>
+              <Card className="group hover:shadow-lg transition-shadow">
+                <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className={`w-2 h-2 rounded-full ${getStatusColor(program.status)}`}></div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -314,8 +401,9 @@ export default function ProgramsPage() {
                     {formatStatus(program.status)}
                   </span>
                 </div>
-              </div>
-            </Card>
+                </div>
+              </Card>
+            </div>
           ))}
         </div>
       ) : (
@@ -337,7 +425,7 @@ export default function ProgramsPage() {
               </thead>
               <tbody>
                 {pageItems.map((program) => (
-                  <tr key={program.id} className="border-b hover:bg-gray-50">
+                  <tr key={program.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/programs/${program.id}`)}>
                     <td className="p-4 text-sm font-medium">{program.code}</td>
                     <td className="p-4 text-sm">{program.name}</td>
                     <td className="p-4 text-sm">Ward {program.ward.code}</td>
@@ -358,13 +446,34 @@ export default function ProgramsPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <button className="p-1 hover:bg-gray-100 rounded">
+                        <button
+                          className="p-1 hover:bg-gray-100 rounded"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/programs/${program.id}`);
+                          }}
+                          title="View Program"
+                        >
                           <Eye className="h-4 w-4 text-gray-600" />
                         </button>
-                        <button className="p-1 hover:bg-gray-100 rounded">
+                        <button
+                          className="p-1 hover:bg-gray-100 rounded"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/programs/${program.id}/edit`);
+                          }}
+                          title="Edit Program"
+                        >
                           <Pencil className="h-4 w-4 text-gray-600" />
                         </button>
-                        <button className="p-1 hover:bg-gray-100 rounded">
+                        <button
+                          className="p-1 hover:bg-gray-100 rounded"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.print();
+                          }}
+                          title="Print Program"
+                        >
                           <Printer className="h-4 w-4 text-gray-600" />
                         </button>
                       </div>

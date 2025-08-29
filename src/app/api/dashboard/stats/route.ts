@@ -1,45 +1,63 @@
 import { NextResponse } from "next/server";
 import { prisma, ensureDbExists } from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function GET() {
   try {
     await ensureDbExists();
+
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Get current fiscal year
     const currentFiscalYear = await prisma.fiscalYear.findFirst({
       where: { isActive: true }
     });
 
-    const fiscalYearFilter = currentFiscalYear 
-      ? { fiscalYearId: currentFiscalYear.id }
-      : {};
+    if (!currentFiscalYear) {
+      return NextResponse.json(
+        { error: "No active fiscal year found" },
+        { status: 400 }
+      );
+    }
+
+    // Get user's ward for filtering (if applicable)
+    const userWardId = session.user.wardId;
+
+    // Build where clause for programs based on user's ward
+    const programWhereClause = userWardId
+      ? { fiscalYearId: currentFiscalYear.id, wardId: userWardId }
+      : { fiscalYearId: currentFiscalYear.id };
 
     // Get total programs for current fiscal year
     const totalPrograms = await prisma.program.count({
-      where: fiscalYearFilter
+      where: programWhereClause
     });
 
     // Get pending approvals count
     const pendingApprovals = await prisma.programApproval.count({
-      where: { 
+      where: {
         status: "pending",
-        program: fiscalYearFilter
+        program: userWardId ? { wardId: userWardId } : {}
       }
     });
 
     // Get budget statistics
     const budgetStats = await prisma.program.aggregate({
-      where: fiscalYearFilter,
+      where: programWhereClause,
       _sum: {
         budget: true
       }
     });
 
-    // Get spent amount (sum of approved payments)
+    // Get total spent from payments
     const spentStats = await prisma.programPayment.aggregate({
       where: {
         status: "approved",
-        program: fiscalYearFilter
+        program: userWardId ? { wardId: userWardId } : {}
       },
       _sum: {
         amount: true
@@ -50,25 +68,34 @@ export async function GET() {
     const pendingPayments = await prisma.programPayment.aggregate({
       where: {
         status: "pending",
-        program: fiscalYearFilter
+        program: userWardId ? { wardId: userWardId } : {}
       },
-      _count: {
-        id: true
-      },
+      _count: true,
       _sum: {
         amount: true
       }
     });
 
-    // Calculate percentage change (mock data for now - would need historical data)
-    const totalBudget = Number(budgetStats._sum.budget || 0);
-    const totalSpent = Number(spentStats._sum.amount || 0);
-    const spentPercentage = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
+    // Calculate budget data
+    const allocatedBudget = Number(budgetStats._sum.budget || 0);
+    const spentBudget = Number(spentStats._sum.amount || 0);
+    const budgetPercentage = allocatedBudget > 0 ? Math.round((spentBudget / allocatedBudget) * 100) : 0;
+
+    // Format currency helper
+    const formatCurrency = (amount: number) => {
+      if (amount >= 1000000) {
+        return `₦${(amount / 1000000).toFixed(1)}M`;
+      } else if (amount >= 1000) {
+        return `₦${(amount / 1000).toFixed(0)}K`;
+      } else {
+        return `₦${amount.toLocaleString()}`;
+      }
+    };
 
     const stats = {
       totalPrograms: {
         value: totalPrograms,
-        change: "+12%", // Mock data - would calculate from previous period
+        change: "+12%", // TODO: Calculate from previous period
         changeType: "positive" as const
       },
       pendingApprovals: {
@@ -77,18 +104,18 @@ export async function GET() {
         changeType: "negative" as const
       },
       budget: {
-        allocated: Number(totalBudget),
-        spent: Number(totalSpent),
-        percentage: spentPercentage,
-        formattedAllocated: `Rs. ${(Number(totalBudget) / 1000000).toFixed(1)}M`,
-        formattedSpent: `Rs. ${(Number(totalSpent) / 1000000).toFixed(1)}M`
+        allocated: allocatedBudget,
+        spent: spentBudget,
+        percentage: budgetPercentage,
+        formattedAllocated: formatCurrency(allocatedBudget),
+        formattedSpent: formatCurrency(spentBudget)
       },
       pendingPayments: {
-        count: pendingPayments._count.id,
+        count: pendingPayments._count,
         amount: Number(pendingPayments._sum.amount || 0),
-        formattedAmount: `Rs. ${(Number(pendingPayments._sum.amount || 0) / 1000000).toFixed(1)}M`
+        formattedAmount: formatCurrency(Number(pendingPayments._sum.amount || 0))
       },
-      fiscalYear: currentFiscalYear?.year || "No active fiscal year"
+      fiscalYear: currentFiscalYear.year
     };
 
     return NextResponse.json({ stats });
